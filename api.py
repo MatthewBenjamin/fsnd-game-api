@@ -3,7 +3,7 @@ from protorpc import messages, remote
 from google.appengine.api import taskqueue
 
 from models import User, Game, Result, StringMessage
-from model import GameForm
+from models import GameForm
 
 # REQUEST MESSAGES
 CREATE_USER_REQUEST = endpoints.ResourceContainer(user_name=messages.StringField(1, required=True),
@@ -11,6 +11,10 @@ CREATE_USER_REQUEST = endpoints.ResourceContainer(user_name=messages.StringField
 
 NEW_GAME_REQUEST = endpoints.ResourceContainer(players = messages.StringField(1, repeated=True))
 
+MAKE_MOVE_REQUEST = endpoints.ResourceContainer(user_key=messages.StringField(1, required=True),
+                                                value=messages.IntegerField(2,
+                                                    variant=messages.Variant.INT32, required=True)
+                                                )
 # TODO: allowed_client_ids & scopes (for oauth)
 @endpoints.api(name='baskin_robbins_31', version='v1')
 class BaskinRobbins31Game(remote.Service):
@@ -58,4 +62,8 @@ class BaskinRobbins31Game(remote.Service):
                       path='make_move',
                       name='make_move',
                       http_method='POST')
+    def make_move(self, request):
+        print request
+        return GameForm()
+
 api = endpoints.api_server([BaskinRobbins31Game])
