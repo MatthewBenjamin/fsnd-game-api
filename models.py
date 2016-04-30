@@ -41,6 +41,12 @@ class GameHistory(ndb.Model):
     user_name = ndb.StringProperty(repeated=True)
     move = ndb.IntegerProperty(repeated=True)
 
+    def to_form(self):
+        form = GameHistoryForm()
+        form.user_name = self.user_name
+        form.move = self.move
+        return form
+
 class GameHistoryForm(messages.Message):
     user_name = messages.StringField(1, repeated=True)
     move = messages.StringField(2, repeated=True)
