@@ -5,18 +5,12 @@ class User(ndb.Model):
     name = ndb.StringProperty(required=True)
     email = ndb.StringProperty()
 
-# ?
-#class UserForm(messages.Message)
-#    name = messages.StringField(1)
-#    email = messages.StringField(2)
-#    user_key = messages.StringField(3)
-
 class Game(ndb.Model):
     current_int = ndb.IntegerProperty(required=True, default=0)
     max_int = ndb.IntegerProperty(required=True, default=31)
     max_increment = ndb.IntegerProperty(required=True, default=3)
     game_over = ndb.BooleanProperty(required=True, default=False)
-    user_keys = ndb.KeyProperty(repeated=True, kind='User')
+    users = ndb.StringProperty(repeated=True)
 
     def to_form(self):
         form = GameForm()
@@ -25,8 +19,7 @@ class Game(ndb.Model):
         form.max_increment = self.max_increment
         form.game_over = self.game_over
         form.urlsafe_game_key = self.key.urlsafe()
-        for user_key in self.user_keys:
-            form.urlsafe_user_keys.append(user_key.urlsafe())
+        form.users = self.users
         return form
 
 class GameForm(messages.Message):
@@ -34,7 +27,7 @@ class GameForm(messages.Message):
     max_int = messages.IntegerField(2, variant=messages.Variant.INT32)
     max_increment = messages.IntegerField(3, variant=messages.Variant.INT32)
     game_over = messages.BooleanField(4)
-    urlsafe_user_keys = messages.StringField(5, repeated=True)
+    users = messages.StringField(5, repeated=True)
     urlsafe_game_key = messages.StringField(6)
 
 class GameHistory(ndb.Model):

@@ -65,9 +65,9 @@ class BaskinRobbins31Game(remote.Service):
             for p in players:
                 player = User.query(User.name == p).get()
                 if not player:
-                    raise endpoints.BadRequestException("User %s doesn't not exist." % p)
+                    raise endpoints.NotFoundException("User %s doesn't not exist." % p)
                 else:
-                    game.user_keys.append(player.key)
+                    game.users.append(player.name)
             # TODO: treat this endpoint as a ndb transaction because of game & GameHistory puts?
             game.put()
             history_id = GameHistory.allocate_ids(size=1, parent=game.key)[0]
