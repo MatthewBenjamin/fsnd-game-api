@@ -14,7 +14,7 @@ CREATE_USER_REQUEST = endpoints.ResourceContainer(user_name=messages.StringField
 REQUEST_BY_USERNAME = endpoints.ResourceContainer(username = messages.StringField(1, required=True))
 NEW_GAME_REQUEST = endpoints.ResourceContainer(players = messages.StringField(1, repeated=True))
 
-MAKE_MOVE_REQUEST = endpoints.ResourceContainer(user_key=messages.StringField(1, required=True),
+MAKE_MOVE_REQUEST = endpoints.ResourceContainer(username=messages.StringField(1, required=True),
                                                 urlsafe_game_key=messages.StringField(2, required=True),
                                                 value=messages.IntegerField(3,
                                                     variant=messages.Variant.INT32, required=True)
@@ -115,7 +115,7 @@ class BaskinRobbins31Game(remote.Service):
         game_history = GameHistory.query(ancestor=ndb.Key(urlsafe=request.urlsafe_game_key)).get()
         return game_history.to_form()
 
-    # TODO: make move method - user's whose turn it is submits next move
+    # TODO: change to ndb.transaction b/c put to game & gamehistory
     @endpoints.method(request_message=MAKE_MOVE_REQUEST,
                       response_message=GameForm,
                       path='make_move',
@@ -124,10 +124,37 @@ class BaskinRobbins31Game(remote.Service):
     def make_move(self, request):
         """Next player makes their move. Returns the updated game state"""
         # TODO: helper function to get game
-        #game = ndb.Key(urlsafe=request.game_key).get()
+        username = request.username
+        move_value = request.value
+        # TODO: invalid game key doesn't work, so 1st error never has chance to fire
         game = get_by_urlsafe(request.urlsafe_game_key, Game)
+        game_history = GameHistory.query(ancestor=game.key).get()
+        print game_history
         if not game:
             raise endpoints.NotFoundException("Game does not exist")
-        return GameForm()
+        if game.game_over:
+            raise endpoints.ForbiddenException("Game has finished")
+        if username not in game.users:
+            raise endpoints.ForbiddenException("User not part of game")
+        if username != game.users[0]:
+            raise endpoints.ForbiddenException("Not user's turn yet")
+        if move_value > game.max_increment or move_value < 1 or not isinstance(move_value, int):
+            raise endpoints.ForbiddenException("Invalid move")
+
+        # Valid game, user, and move. proceed
+        # game logic
+        game.current_int += move_value
+        game_history.user_name.append(username)
+        game_history.move.append(move_value)
+        # TODO: game history
+        if game.current_int >= game.max_int:
+            # TODO: generate scores, etc.
+            game.game_over = True
+        else:
+            game.users.append(game.users.pop(0))
+        # TODO: 2 transactions(after add game history put, so use ndb.transaction)
+        game.put()
+        game_history.put()
+        return game.to_form()
 
 api = endpoints.api_server([BaskinRobbins31Game])
