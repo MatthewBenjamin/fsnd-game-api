@@ -30,6 +30,9 @@ class GameForm(messages.Message):
     users = messages.StringField(5, repeated=True)
     urlsafe_game_key = messages.StringField(6)
 
+class GameForms(messages.Message):
+    games = messages.MessageField(GameForm, 1, repeated=True)
+
 class GameHistory(ndb.Model):
     user_name = ndb.StringProperty(repeated=True)
     move = ndb.IntegerProperty(repeated=True)

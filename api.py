@@ -4,16 +4,18 @@ from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
 
 from models import User, Game, GameHistory, Result, StringMessage
-from models import GameForm, GameHistoryForm
+from models import GameForm, GameForms, GameHistoryForm
+
+from utils import get_by_urlsafe
 
 # REQUEST MESSAGES
 CREATE_USER_REQUEST = endpoints.ResourceContainer(user_name=messages.StringField(1, required=True),
                                                   email=messages.StringField(2))
-
+REQUEST_BY_USERNAME = endpoints.ResourceContainer(username = messages.StringField(1, required=True))
 NEW_GAME_REQUEST = endpoints.ResourceContainer(players = messages.StringField(1, repeated=True))
 
 MAKE_MOVE_REQUEST = endpoints.ResourceContainer(user_key=messages.StringField(1, required=True),
-                                                game_key=messages.StringField(2, required=True),
+                                                urlsafe_game_key=messages.StringField(2, required=True),
                                                 value=messages.IntegerField(3,
                                                     variant=messages.Variant.INT32, required=True)
                                                 )
@@ -25,10 +27,6 @@ class BaskinRobbins31Game(remote.Service):
 
     #####################################################
     # TODO: Methods to implement
-    #       - get_user(get user by user key (and/or user_name? - get_key_by_username?))
-    #
-    #       - get_user_games - get list of games by user(current or complete? cancelled games?)
-    #
     #       - cancel_game (what if multiple players? -quit/leave_game instead?)
     #
     #       - get_user_rankings - generate player rankings, return each player's name and
@@ -36,25 +34,39 @@ class BaskinRobbins31Game(remote.Service):
     #
     #####################################################
 
+    ##### USER METHODS #####
     @endpoints.method(request_message=CREATE_USER_REQUEST,
                       response_message=StringMessage,
-                      path='user',
+                      path='create_user',
                       name='create_user',
                       http_method='POST')
     def create_user(self, request):
-        """Create a new user."""
+        """Create a new user"""
         if User.query(User.name == request.user_name).get():
             raise endpoints.ConflictException("A User with that name already exists.")
         user = User(name=request.user_name, email=request.email)
         user.put()
         return StringMessage(message="User %s created" % request.user_name)
 
+    #- get_user_games - get list of games by user(current or complete? cancelled games?)
+    @endpoints.method(request_message=REQUEST_BY_USERNAME,
+                      response_message=GameForms,
+                      path='user/{username}/games',
+                      name='get_user_games',
+                      http_method='GET')
+    def get_user_games(self, request):
+        """Get a user's games (by unique username)"""
+        games = Game.query(Game.users.IN((request.username,))).fetch()
+        return GameForms(games = [game.to_form() for game in games])
+
+    ##### GAME METHODS #####
     @endpoints.method(request_message=NEW_GAME_REQUEST,
                       response_message=GameForm,
                       path='new_game',
                       name='new_game',
                       http_method='POST')
     def new_game(self, request):
+        """Create a new game"""
         players = request.players
         if len(players) < 2:
             raise endpoints.BadRequestException("You must specify at least two players.")
@@ -83,8 +95,10 @@ class BaskinRobbins31Game(remote.Service):
                       name='get_game',
                       http_method='GET')
     def get_game(self, request):
+        """Get game by URL safe key"""
         # TODO: raise bad request, etc. errors
-        game = ndb.Key(urlsafe=request.urlsafe_game_key).get()
+        #game = ndb.Key(urlsafe=request.urlsafe_game_key).get()
+        game = get_by_urlsafe(request.urlsafe_game_key, Game)
         return game.to_form()
 
     # get game history by key
@@ -96,6 +110,7 @@ class BaskinRobbins31Game(remote.Service):
                       name='get_game_history',
                       http_method='GET')
     def get_game_history(self, request):
+        """Get game history by game's urlsafe key"""
         # TODO: raise bad request, etc. errors
         game_history = GameHistory.query(ancestor=ndb.Key(urlsafe=request.urlsafe_game_key)).get()
         return game_history.to_form()
@@ -107,7 +122,12 @@ class BaskinRobbins31Game(remote.Service):
                       name='make_move',
                       http_method='POST')
     def make_move(self, request):
-        print request
+        """Next player makes their move. Returns the updated game state"""
+        # TODO: helper function to get game
+        #game = ndb.Key(urlsafe=request.game_key).get()
+        game = get_by_urlsafe(request.urlsafe_game_key, Game)
+        if not game:
+            raise endpoints.NotFoundException("Game does not exist")
         return GameForm()
 
 api = endpoints.api_server([BaskinRobbins31Game])
