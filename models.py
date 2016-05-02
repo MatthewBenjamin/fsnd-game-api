@@ -12,7 +12,7 @@ class Game(ndb.Model):
     game_over = ndb.BooleanProperty(required=True, default=False)
     users = ndb.StringProperty(repeated=True)
 
-    def to_form(self):
+    def to_form(self, message=None):
         form = GameForm()
         form.current_int = self.current_int
         form.max_int = self.max_int
@@ -20,6 +20,7 @@ class Game(ndb.Model):
         form.game_over = self.game_over
         form.urlsafe_game_key = self.key.urlsafe()
         form.users = self.users
+        form.message = message
         return form
 
 # TODO: add message field
@@ -30,6 +31,7 @@ class GameForm(messages.Message):
     game_over = messages.BooleanField(4)
     users = messages.StringField(5, repeated=True)
     urlsafe_game_key = messages.StringField(6)
+    message = messages.StringField(7)
 
 class GameForms(messages.Message):
     games = messages.MessageField(GameForm, 1, repeated=True)

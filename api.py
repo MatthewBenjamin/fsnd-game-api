@@ -86,7 +86,7 @@ class BaskinRobbins31Game(remote.Service):
             history_key = ndb.Key(GameHistory, history_id, parent=game.key)
             GameHistory(key=history_key).put()
 
-        return game.to_form()
+        return game.to_form(message="New Game Created!")
 
     # get simple game info by key
     @endpoints.method(request_message=GET_GAME_REQUEST,
@@ -150,11 +150,13 @@ class BaskinRobbins31Game(remote.Service):
         if game.current_int >= game.max_int:
             # TODO: generate scores, etc.
             game.game_over = True
+            message = "Game Over! %s is the loser." % (username)
         else:
             game.users.append(game.users.pop(0))
+            message = "Current value: %s - It's now %s's turn." % (game.current_int, game.users[0])
         # TODO: 2 transactions(after add game history put, so use ndb.transaction)
         game.put()
         game_history.put()
-        return game.to_form()
+        return game.to_form(message=message)
 
 api = endpoints.api_server([BaskinRobbins31Game])
