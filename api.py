@@ -144,9 +144,7 @@ class BaskinRobbins31Game(remote.Service):
         # Valid game, user, and move. proceed
         # game logic
         game.current_int += move_value
-        game_history.user_name.append(username)
-        game_history.move.append(move_value)
-        # TODO: game history
+        game_history.add_move(username, move_value)
         if game.current_int >= game.max_int:
             # TODO: generate scores, etc.
             game.game_over = True

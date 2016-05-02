@@ -23,7 +23,6 @@ class Game(ndb.Model):
         form.message = message
         return form
 
-# TODO: add message field
 class GameForm(messages.Message):
     current_int = messages.IntegerField(1, variant=messages.Variant.INT32)
     max_int = messages.IntegerField(2, variant=messages.Variant.INT32)
@@ -36,20 +35,32 @@ class GameForm(messages.Message):
 class GameForms(messages.Message):
     games = messages.MessageField(GameForm, 1, repeated=True)
 
-# TODO: store as list of tuples instead? ndb.pickleproperty
-class GameHistory(ndb.Model):
-    user_name = ndb.StringProperty(repeated=True)
-    move = ndb.IntegerProperty(repeated=True)
+class MoveRecord(ndb.Model):
+    username = ndb.StringProperty(required=True)
+    move = ndb.IntegerProperty(required=True)
 
+    #TODO to_form()
     def to_form(self):
-        form = GameHistoryForm()
-        form.user_name = self.user_name
+        form = MoveRecordForm()
+        form.name = self.username
         form.move = self.move
         return form
 
+class GameHistory(ndb.Model):
+    moves = ndb.StructuredProperty(MoveRecord, repeated=True)
+
+    def add_move(self,username,move):
+        self.moves.append(MoveRecord(username=username,move=move))
+
+    def to_form(self):
+        return GameHistoryForm(moves=[move.to_form() for move in self.moves])
+
+class MoveRecordForm(messages.Message):
+    name = messages.StringField(1, required=True)
+    move = messages.IntegerField(2, required=True, variant=messages.Variant.INT32)
+
 class GameHistoryForm(messages.Message):
-    user_name = messages.StringField(1, repeated=True)
-    move = messages.IntegerField(2, repeated=True, variant=messages.Variant.INT32)
+    moves = messages.MessageField(MoveRecordForm, 1, repeated=True)
 
 class Result(ndb.Model):
     # descendant of user
