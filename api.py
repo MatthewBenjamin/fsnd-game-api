@@ -81,11 +81,14 @@ class BaskinRobbins31Game(remote.Service):
             raise endpoints.BadRequestException("You must specify at least two players.")
         if len(players) != len(set(players)):
             raise endpoints.BadRequestException("You must only specify unique players.")
-        #TODO: check game variables
-        if max_increment < 2:
+        if max_increment and max_increment < 2:
             raise endpoints.BadRequestException("max_increment must be at least 2")
-        if max_int <= starting_int:
+        if max_int and starting_int and max_int <= starting_int:
             raise endpoints.BadRequestException("Starting value must be smaller than ending value")
+        elif max_int and max_int <1:
+            raise endpoints.BadRequestException("max_int must be at least 1")
+        elif starting_int and starting_int > 30:
+            raise endpoints.BadRequestException("starting_int is too big")
 
         shuffle(players)
         game = Game()
@@ -107,7 +110,7 @@ class BaskinRobbins31Game(remote.Service):
         history_key = ndb.Key(GameHistory, history_id, parent=game.key)
         GameHistory(key=history_key).put()
 
-        return game.to_form(message="New game created with a starting value of %s - The first player is %s" % (starting_int, game.users[0]))
+        return game.to_form(message="New game created with a starting value of %s - The first player is %s" % (game.current_int, game.users[0]))
 
     # get simple game info by key
     @endpoints.method(request_message=GET_GAME_REQUEST,
