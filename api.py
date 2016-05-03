@@ -8,11 +8,16 @@ from models import GameForm, GameForms, GameHistoryForm
 
 from utils import get_by_urlsafe
 
+from random import shuffle
+
 # REQUEST MESSAGES
 CREATE_USER_REQUEST = endpoints.ResourceContainer(user_name=messages.StringField(1, required=True),
                                                   email=messages.StringField(2))
 REQUEST_BY_USERNAME = endpoints.ResourceContainer(username = messages.StringField(1, required=True))
-NEW_GAME_REQUEST = endpoints.ResourceContainer(players = messages.StringField(1, repeated=True))
+NEW_GAME_REQUEST = endpoints.ResourceContainer(players = messages.StringField(1, repeated=True),
+                                               starting_int=messages.IntegerField(2, variant=messages.Variant.INT32),
+                                               max_int=messages.IntegerField(3, variant=messages.Variant.INT32),
+                                               max_increment=messages.IntegerField(4, variant=messages.Variant.INT32))
 
 MAKE_MOVE_REQUEST = endpoints.ResourceContainer(username=messages.StringField(1, required=True),
                                                 urlsafe_game_key=messages.StringField(2, required=True),
@@ -68,25 +73,41 @@ class BaskinRobbins31Game(remote.Service):
     def new_game(self, request):
         """Create a new game"""
         players = request.players
+        starting_int = request.starting_int
+        max_int = request.max_int
+        max_increment = request.max_increment
+
         if len(players) < 2:
             raise endpoints.BadRequestException("You must specify at least two players.")
-        elif len(players) != len(set(players)):
+        if len(players) != len(set(players)):
             raise endpoints.BadRequestException("You must only specify unique players.")
-        else:
-            game = Game()
-            for p in players:
-                player = User.query(User.name == p).get()
-                if not player:
-                    raise endpoints.NotFoundException("User %s doesn't not exist." % p)
-                else:
-                    game.users.append(player.name)
-            # TODO: treat this endpoint as a ndb transaction because of game & GameHistory puts?
-            game.put()
-            history_id = GameHistory.allocate_ids(size=1, parent=game.key)[0]
-            history_key = ndb.Key(GameHistory, history_id, parent=game.key)
-            GameHistory(key=history_key).put()
+        #TODO: check game variables
+        if max_increment < 2:
+            raise endpoints.BadRequestException("max_increment must be at least 2")
+        if max_int <= starting_int:
+            raise endpoints.BadRequestException("Starting value must be smaller than ending value")
 
-        return game.to_form(message="New Game Created!")
+        shuffle(players)
+        game = Game()
+        for p in players:
+            player = User.query(User.name == p).get()
+            if not player:
+                raise endpoints.NotFoundException("User %s doesn't not exist." % p)
+            else:
+                game.users.append(player.name)
+        if starting_int:
+            game.current_int = starting_int
+        if max_int:
+            game.max_int = max_int
+        if max_increment:
+            game.max_increment = max_increment
+        # TODO: treat this endpoint as a ndb transaction because of game & GameHistory puts?
+        game.put()
+        history_id = GameHistory.allocate_ids(size=1, parent=game.key)[0]
+        history_key = ndb.Key(GameHistory, history_id, parent=game.key)
+        GameHistory(key=history_key).put()
+
+        return game.to_form(message="New game created with a starting value of %s - The first player is %s" % (starting_int, game.users[0]))
 
     # get simple game info by key
     @endpoints.method(request_message=GET_GAME_REQUEST,
@@ -138,7 +159,7 @@ class BaskinRobbins31Game(remote.Service):
             raise endpoints.ForbiddenException("User not part of game")
         if username != game.users[0]:
             raise endpoints.ForbiddenException("Not user's turn yet")
-        if move_value > game.max_increment or move_value < 1 or not isinstance(move_value, int):
+        if move_value > game.max_increment or move_value < 1:
             raise endpoints.ForbiddenException("Invalid move")
 
         # Valid game, user, and move. proceed
