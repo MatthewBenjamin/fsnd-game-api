@@ -25,6 +25,8 @@ MAKE_MOVE_REQUEST = endpoints.ResourceContainer(username=messages.StringField(1,
                                                     variant=messages.Variant.INT32, required=True)
                                                 )
 GET_GAME_REQUEST = endpoints.ResourceContainer(urlsafe_game_key=messages.StringField(1, required=True),)
+QUIT_GAME_REQUEST = endpoints.ResourceContainer(username=messages.StringField(1, required=True),
+                                                urlsafe_game_key=messages.StringField(2, required=True))
 # TODO: allowed_client_ids & scopes (for oauth)
 @endpoints.api(name='baskin_robbins_31', version='v1')
 class BaskinRobbins31Game(remote.Service):
@@ -63,6 +65,22 @@ class BaskinRobbins31Game(remote.Service):
         """Get a user's games (by unique username)"""
         games = Game.query(Game.users.IN((request.username,))).fetch()
         return GameForms(games = [game.to_form() for game in games])
+
+    @endpoints.method(request_message=QUIT_GAME_REQUEST,
+                      response_message=GameForm,
+                      path='quit_game',
+                      name='quit_game',
+                      http_method='POST')
+    def quit_game(self, request):
+        game = get_by_urlsafe(request.urlsafe_game_key, Game)
+        game_history = GameHistory.query(ancestor=game.key).get()
+        game_history.add_move(request.username, 'quit')
+        #TODO: DRY transactions (see make_move)?
+        transaction = game.end_game(loserindex=game.users.index(request.username))
+        transaction['game'] = game
+        transaction['game_history'] = game_history
+        self._save_move_results(**transaction)
+        return game.to_form(message="%s has quit. Game over!" % request.username)
 
     ##### GAME METHODS #####
     @endpoints.method(request_message=NEW_GAME_REQUEST,
