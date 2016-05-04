@@ -90,18 +90,20 @@ class GameForms(messages.Message):
 class MoveRecord(ndb.Model):
     username = ndb.StringProperty(required=True)
     move = ndb.StringProperty(required=True)
-    #TODO add datetime when mve was made
+    datetime = ndb.DateTimeProperty(auto_now_add=True)
 
     #TODO to_form()
     def to_form(self):
         form = MoveRecordForm()
         form.name = self.username
         form.move = self.move
+        form.datetime = str(self.datetime)
         return form
 
 class MoveRecordForm(messages.Message):
     name = messages.StringField(1, required=True)
     move = messages.StringField(2, required=True)
+    datetime = messages.StringField(3)
 
 class GameHistory(ndb.Model):
     moves = ndb.StructuredProperty(MoveRecord, repeated=True)
