@@ -6,6 +6,21 @@ class User(ndb.Model):
     email = ndb.StringProperty()
     rating = ndb.FloatProperty(default=0)
 
+    def to_form(self):
+        form = UserForm()
+        form.name = self.name
+        form.email = self.email
+        form.rating = self.rating
+        return form
+
+class UserForm(messages.Message):
+    name = messages.StringField(1, required=True)
+    email = messages.StringField(2)
+    rating = messages.FloatField(3)
+
+class UserForms(messages.Message):
+    users = messages.MessageField(UserForm, 1, repeated=True)
+
 class Game(ndb.Model):
     current_int = ndb.IntegerProperty(required=True, default=0)
     max_int = ndb.IntegerProperty(required=True, default=31)
@@ -84,6 +99,10 @@ class MoveRecord(ndb.Model):
         form.move = self.move
         return form
 
+class MoveRecordForm(messages.Message):
+    name = messages.StringField(1, required=True)
+    move = messages.StringField(2, required=True)
+
 class GameHistory(ndb.Model):
     moves = ndb.StructuredProperty(MoveRecord, repeated=True)
 
@@ -92,10 +111,6 @@ class GameHistory(ndb.Model):
 
     def to_form(self):
         return GameHistoryForm(moves=[move.to_form() for move in self.moves])
-
-class MoveRecordForm(messages.Message):
-    name = messages.StringField(1, required=True)
-    move = messages.StringField(2, required=True)
 
 class GameHistoryForm(messages.Message):
     moves = messages.MessageField(MoveRecordForm, 1, repeated=True)

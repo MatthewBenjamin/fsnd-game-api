@@ -1,10 +1,10 @@
 import endpoints
-from protorpc import messages, remote
+from protorpc import messages, message_types, remote
 from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
 
 from models import User, Game, GameHistory, Score, StringMessage
-from models import GameForm, GameForms, GameHistoryForm
+from models import GameForm, GameForms, GameHistoryForm, UserForms
 
 from utils import get_by_urlsafe
 
@@ -81,6 +81,15 @@ class BaskinRobbins31Game(remote.Service):
         transaction['game_history'] = game_history
         self._save_move_results(**transaction)
         return game.to_form(message="%s has quit. Game over!" % request.username)
+
+    @endpoints.method(request_message=message_types.VoidMessage,
+                      response_message=UserForms,
+                      path='rankings',
+                      name='get_user_rankings',
+                      http_method='GET')
+    def get_user_rankings(self, request):
+        rankings = User.query().order(-User.rating).fetch()
+        return UserForms(users=[user.to_form() for user in rankings])
 
     ##### GAME METHODS #####
     @endpoints.method(request_message=NEW_GAME_REQUEST,
