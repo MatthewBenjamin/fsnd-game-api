@@ -3,7 +3,7 @@ from protorpc import messages, remote
 from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
 
-from models import User, Game, GameHistory, Result, StringMessage
+from models import User, Game, GameHistory, Score, StringMessage
 from models import GameForm, GameForms, GameHistoryForm
 
 from utils import get_by_urlsafe
@@ -32,11 +32,11 @@ class BaskinRobbins31Game(remote.Service):
 
     #####################################################
     # TODO: Methods to implement
-    #       - cancel_game (what if multiple players? -quit/leave_game instead?)
     #
     #       - get_user_rankings - generate player rankings, return each player's name and
     #                           - performance indicator (e.g. won/loss percentage)
     #
+    #       - add PC players
     #####################################################
 
     ##### USER METHODS #####
@@ -105,10 +105,11 @@ class BaskinRobbins31Game(remote.Service):
         if max_increment:
             game.max_increment = max_increment
         # TODO: treat this endpoint as a ndb transaction because of game & GameHistory puts?
-        game.put()
+        #game.put()
         history_id = GameHistory.allocate_ids(size=1, parent=game.key)[0]
         history_key = ndb.Key(GameHistory, history_id, parent=game.key)
-        GameHistory(key=history_key).put()
+        game_history = GameHistory(key=history_key)
+        self._save_move_results(game=game, game_history=game_history)
 
         return game.to_form(message="New game created with a starting value of %s - The first player is %s" % (game.current_int, game.users[0]))
 
@@ -139,7 +140,50 @@ class BaskinRobbins31Game(remote.Service):
         game_history = GameHistory.query(ancestor=ndb.Key(urlsafe=request.urlsafe_game_key)).get()
         return game_history.to_form()
 
-    # TODO: change to ndb.transaction b/c put to game & gamehistory
+    @ndb.transactional(xg=True)
+    def _save_move_results(self, game, game_history, winners=None, loser=None, scores=None):
+        game.put()
+        game_history.put()
+        if winners and loser and scores:
+            ndb.put_multi(winners)
+            ndb.put_multi(scores)
+            loser.put()
+
+    def _make_move(self, request):
+        username = request.username
+        move_value = request.value
+        # TODO: invalid game key doesn't work, so 1st error never has chance to fire - is it needed?
+        game = get_by_urlsafe(request.urlsafe_game_key, Game)
+        game_history = GameHistory.query(ancestor=game.key).get()
+        if game.game_over:
+            return game.to_form(message="Game has already finished!")
+        if username not in game.users:
+            return game.to_form(message="User not part of game")
+        if username != game.users[0]:
+            return game.to_form(message="Not user's turn yet")
+        if move_value > game.max_increment or move_value < 1:
+            return game.to_form(message="Invalid move value")
+
+        # Valid game, user, and move. proceed
+        # game logic
+        game.current_int += move_value
+        game_history.add_move(username, str(move_value))
+
+        if game.current_int >= game.max_int:
+            transaction = game.end_game()
+            message = "Game Over! %s is the loser." % (username)
+        else:
+            game.users.append(game.users.pop(0))
+            message = "Current value: %s - It's now %s's turn." % (game.current_int, game.users[0])
+            #TODO: transaction is declared twice...(kinda)  ?
+            transaction = {}
+
+        transaction['game'] = game
+        transaction['game_history'] = game_history
+
+        self._save_move_results(**transaction)
+        return game.to_form(message=message)
+
     @endpoints.method(request_message=MAKE_MOVE_REQUEST,
                       response_message=GameForm,
                       path='make_move',
@@ -147,38 +191,7 @@ class BaskinRobbins31Game(remote.Service):
                       http_method='POST')
     def make_move(self, request):
         """Next player makes their move. Returns the updated game state"""
-        # TODO: helper function to get game
-        username = request.username
-        move_value = request.value
-        # TODO: invalid game key doesn't work, so 1st error never has chance to fire
-        game = get_by_urlsafe(request.urlsafe_game_key, Game)
-        game_history = GameHistory.query(ancestor=game.key).get()
-        print game_history
-        if not game:
-            raise endpoints.NotFoundException("Game does not exist")
-        if game.game_over:
-            raise endpoints.ForbiddenException("Game has finished")
-        if username not in game.users:
-            raise endpoints.ForbiddenException("User not part of game")
-        if username != game.users[0]:
-            raise endpoints.ForbiddenException("Not user's turn yet")
-        if move_value > game.max_increment or move_value < 1:
-            raise endpoints.ForbiddenException("Invalid move")
+        return self._make_move(request)
 
-        # Valid game, user, and move. proceed
-        # game logic
-        game.current_int += move_value
-        game_history.add_move(username, move_value)
-        if game.current_int >= game.max_int:
-            # TODO: generate scores, etc.
-            game.game_over = True
-            message = "Game Over! %s is the loser." % (username)
-        else:
-            game.users.append(game.users.pop(0))
-            message = "Current value: %s - It's now %s's turn." % (game.current_int, game.users[0])
-        # TODO: 2 transactions(after add game history put, so use ndb.transaction)
-        game.put()
-        game_history.put()
-        return game.to_form(message=message)
 
 api = endpoints.api_server([BaskinRobbins31Game])

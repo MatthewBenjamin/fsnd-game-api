@@ -4,6 +4,7 @@ from protorpc import messages
 class User(ndb.Model):
     name = ndb.StringProperty(required=True)
     email = ndb.StringProperty()
+    rating = ndb.FloatProperty(default=0)
 
 class Game(ndb.Model):
     current_int = ndb.IntegerProperty(required=True, default=0)
@@ -11,6 +12,8 @@ class Game(ndb.Model):
     max_increment = ndb.IntegerProperty(required=True, default=3)
     game_over = ndb.BooleanProperty(required=True, default=False)
     users = ndb.StringProperty(repeated=True)
+    created = ndb.DateTimeProperty(auto_now_add=True)
+    last_update = ndb.DateTimeProperty(auto_now=True)
 
     def to_form(self, message=None):
         form = GameForm()
@@ -21,7 +24,39 @@ class Game(ndb.Model):
         form.urlsafe_game_key = self.key.urlsafe()
         form.users = self.users
         form.message = message
+        form.created = str(self.created)
+        form.last_update = str(self.last_update)
         return form
+
+    #TODO: get loser by index or name?
+    def end_game(self, loserindex=0):
+        self.game_over = True
+        loser = self.users.pop(loserindex)
+        winners = self.users
+        winner_score = 1.0 / len(winners)
+        winners = User.query(User.name.IN(winners)).fetch()
+        scores = []
+        for user in winners:
+            user.rating += winner_score
+            # TODO allocate multiple ids outside of loop(size=len(winners), then assign in loop?
+            score_id = Score.allocate_ids(size=1, parent=user.key)[0]
+            score_key = ndb.Key(Score, score_id, parent=user.key)
+            score = Score(points=winner_score, game_key=self.key, key=score_key)
+            scores.append(score)
+
+        loser = User.query(User.name == loser).get()
+        loser.rating -= 1
+        score_id = Score.allocate_ids(size=1, parent=loser.key)[0]
+        score_key = ndb.Key(Score, score_id, parent=loser.key)
+        score = Score(points=-1,game_key=self.key, key=score_key)
+        scores.append(score)
+
+        transaction = {
+            'winners': winners,
+            'loser': loser,
+            'scores':scores
+        }
+        return transaction
 
 class GameForm(messages.Message):
     current_int = messages.IntegerField(1, variant=messages.Variant.INT32)
@@ -31,13 +66,16 @@ class GameForm(messages.Message):
     users = messages.StringField(5, repeated=True)
     urlsafe_game_key = messages.StringField(6)
     message = messages.StringField(7)
+    created = messages.StringField(8)
+    last_update = messages.StringField(9)
 
 class GameForms(messages.Message):
     games = messages.MessageField(GameForm, 1, repeated=True)
 
 class MoveRecord(ndb.Model):
     username = ndb.StringProperty(required=True)
-    move = ndb.IntegerProperty(required=True)
+    move = ndb.StringProperty(required=True)
+    #TODO add datetime when mve was made
 
     #TODO to_form()
     def to_form(self):
@@ -57,18 +95,26 @@ class GameHistory(ndb.Model):
 
 class MoveRecordForm(messages.Message):
     name = messages.StringField(1, required=True)
-    move = messages.IntegerField(2, required=True, variant=messages.Variant.INT32)
+    move = messages.StringField(2, required=True)
 
 class GameHistoryForm(messages.Message):
     moves = messages.MessageField(MoveRecordForm, 1, repeated=True)
 
-class Result(ndb.Model):
-    # descendant of user
-    # game = ndb.keyProperty(required=True, kind='Game') ?
-    datetime  = ndb.DateTimeProperty(required=True)
-    won = ndb.BooleanProperty(required=True)
-    #points = float? (1.0 / winning # of players - i.e. 1 point for win divided among winners)
-    #           - still need won bool?
+class Score(ndb.Model):
+    created = ndb.DateTimeProperty(auto_now_add=True)
+    points = ndb.FloatProperty(required=True) # 1.0 / number of winners
+    game_key = ndb.KeyProperty(required=True, kind="Game")
+
+    def to_form(self):
+        form = ScoreForm()
+        form.created = str(self.created)
+        form.points = self.points
+        form.game_key = self.game_key.urlsafe()
+
+class ScoreForm(messages.Message):
+    created = messages.StringField(1)
+    points = messages.FloatField(2)
+    game_key = messages.StringField(3)
 
 class StringMessage(messages.Message):
     """StringMessage -- outbound (single) string message"""
