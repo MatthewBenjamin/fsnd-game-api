@@ -35,8 +35,6 @@ class BaskinRobbins31Game(remote.Service):
     #####################################################
     # TODO: Methods to implement
     #
-    #       - get_user_rankings - generate player rankings, return each player's name and
-    #                           - performance indicator (e.g. won/loss percentage)
     #
     #       - add PC players
     #####################################################
@@ -55,7 +53,7 @@ class BaskinRobbins31Game(remote.Service):
         user.put()
         return StringMessage(message="User %s created" % request.user_name)
 
-    #- get_user_games - get list of games by user(current or complete? cancelled games?)
+    # TODO: add optional params to request for completed games, cancelled(?), won, lost, etc.
     @endpoints.method(request_message=REQUEST_BY_USERNAME,
                       response_message=GameForms,
                       path='user/{username}/games',
@@ -82,6 +80,7 @@ class BaskinRobbins31Game(remote.Service):
         self._save_move_results(**transaction)
         return game.to_form(message="%s has quit. Game over!" % request.username)
 
+    # TODO: error handling?
     @endpoints.method(request_message=message_types.VoidMessage,
                       response_message=UserForms,
                       path='rankings',
@@ -92,6 +91,8 @@ class BaskinRobbins31Game(remote.Service):
         return UserForms(users=[user.to_form() for user in rankings])
 
     ##### GAME METHODS #####
+
+    # TODO: make code cleaner/more modular?
     @endpoints.method(request_message=NEW_GAME_REQUEST,
                       response_message=GameForm,
                       path='new_game',
@@ -131,14 +132,17 @@ class BaskinRobbins31Game(remote.Service):
             game.max_int = max_int
         if max_increment:
             game.max_increment = max_increment
-        # TODO: treat this endpoint as a ndb transaction because of game & GameHistory puts?
-        #game.put()
+
+        # TODO: use game classmethod? (i.e. new_game())
+        # can't do both puts in same transaction (game needs a key to be ancestor)
+        # - any alternative failsafes?
+        game.put()
         history_id = GameHistory.allocate_ids(size=1, parent=game.key)[0]
         history_key = ndb.Key(GameHistory, history_id, parent=game.key)
-        game_history = GameHistory(key=history_key)
-        self._save_move_results(game=game, game_history=game_history)
+        GameHistory(key=history_key).put()
 
-        return game.to_form(message="New game created with a starting value of %s - The first player is %s" % (game.current_int, game.users[0]))
+        return game.to_form(message="New game created with a starting value of %s - The first player is %s"
+               % (game.current_int, game.users[0]))
 
     # get simple game info by key
     @endpoints.method(request_message=GET_GAME_REQUEST,
