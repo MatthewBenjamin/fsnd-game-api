@@ -19,3 +19,9 @@ indexes:
   properties:
   - name: name
   - name: email
+
+- kind: User
+  properties:
+  - name: rating
+    direction: desc
+  - name: name

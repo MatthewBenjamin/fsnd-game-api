@@ -9,13 +9,13 @@ class User(ndb.Model):
     def to_form(self):
         form = UserForm()
         form.name = self.name
-        form.email = self.email
+        #form.email = self.email
         form.rating = self.rating
         return form
 
 class UserForm(messages.Message):
     name = messages.StringField(1, required=True)
-    email = messages.StringField(2)
+    #email = messages.StringField(2)
     rating = messages.FloatField(3)
 
 class UserForms(messages.Message):
@@ -46,8 +46,8 @@ class Game(ndb.Model):
     #TODO: get loser by index or name?
     def end_game(self, loserindex=0):
         self.game_over = True
-        loser = self.users.pop(loserindex)
-        winners = self.users
+        loser = self.users[loserindex]
+        winners = self.users[:loserindex] + self.users[loserindex+1:]
         winner_score = 1.0 / len(winners)
         winners = User.query(User.name.IN(winners)).fetch()
         scores = []
@@ -92,7 +92,6 @@ class MoveRecord(ndb.Model):
     move = ndb.StringProperty(required=True)
     datetime = ndb.DateTimeProperty(auto_now_add=True)
 
-    #TODO to_form()
     def to_form(self):
         form = MoveRecordForm()
         form.name = self.username

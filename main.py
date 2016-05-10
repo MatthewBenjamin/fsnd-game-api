@@ -21,10 +21,10 @@ class SendReminderEmail(webapp2.RequestHandler):
         for game in old_games:
             users_to_email.append(game.users[0])
         users_to_email = set(users_to_email)
-        users_to_email = User.query(User.name.IN(users_to_email), User.email != None).fetch()
+        users_to_email = User.query(User.name.IN(users_to_email)).fetch()
         for user in users_to_email:
             subject = 'This is a reminder!'
-            body = 'Hello, a Baskin Robbins 31 game is waiting on your turn!'
+            body = 'Hello, you have one or more pending Baskin Robbins 31 games!'
             # This will send test emails, the arguments to send_mail are:
             # from, to, subject, body
             mail.send_mail('noreply@{}.appspotmail.com'.format(app_id),
