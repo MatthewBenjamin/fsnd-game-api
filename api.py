@@ -151,13 +151,9 @@ class BaskinRobbins31Game(remote.Service):
     def get_game(self, request):
         """Get game by URL safe key"""
         # TODO: raise bad request, etc. errors (in utils?)
-        #game = ndb.Key(urlsafe=request.urlsafe_game_key).get()
         game = get_by_urlsafe(request.urlsafe_game_key, Game)
         return game.to_form()
 
-    # get game history by key
-    #       - get_game_history  - return history of moves in a game
-    #                           - i.e. [(matt, 3), (john, 2), (bill, 3) ....(john, 1)]
     @endpoints.method(request_message=GAME_REQUEST,
                       response_message=GameHistoryForm,
                       path='game/{urlsafe_game_key}/history',
@@ -178,15 +174,20 @@ class BaskinRobbins31Game(remote.Service):
             ndb.put_multi(scores)
             loser.put()
 
-    def _make_move(self, request):
+    @endpoints.method(request_message=MAKE_MOVE_REQUEST,
+                      response_message=GameForm,
+                      path='make_move',
+                      name='make_move',
+                      http_method='POST')
+    def make_move(self, request):
+        """Next player makes their move. Returns the updated game state"""
         g_user = endpoints.get_current_user()
         if not g_user:
             raise endpoints.UnauthorizedException('Authorization required')
 
         user = User.query(User.email == g_user.email()).get()
         if not user:
-            # TODO new user? - not for existing game....
-            raise endpoints.UnauthorizedException('Authorization required')
+            raise endpoints.NotFoundException('User does not exist')
 
         game = get_by_urlsafe(request.urlsafe_game_key, Game)
         move_value = request.value
@@ -200,35 +201,9 @@ class BaskinRobbins31Game(remote.Service):
         if move_value > game.max_increment or move_value < 1:
             return game.to_form(message="Invalid move value")
 
-        game_history = GameHistory.query(ancestor=game.key).get()
-        # Valid game, user, and move. proceed
-        # game logic
-        game.current_int += move_value
-        game_history.add_move(user.name, str(move_value))
-
-        if game.current_int >= game.max_int:
-            transaction = game.end_game()
-            message = "Game Over! %s is the loser." % (user.name)
-        else:
-            game.users.append(game.users.pop(0))
-            message = "Move successful!"
-            #TODO: transaction is declared twice...(kinda)  ?
-            transaction = {}
-
-        transaction['game'] = game
-        transaction['game_history'] = game_history
+        transaction, message = game.make_move(move_value)
 
         self._save_move_results(**transaction)
         return game.to_form(message=message)
-
-    @endpoints.method(request_message=MAKE_MOVE_REQUEST,
-                      response_message=GameForm,
-                      path='make_move',
-                      name='make_move',
-                      http_method='POST')
-    def make_move(self, request):
-        """Next player makes their move. Returns the updated game state"""
-        return self._make_move(request)
-
 
 api = endpoints.api_server([BaskinRobbins31Game])

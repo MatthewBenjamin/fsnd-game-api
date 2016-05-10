@@ -36,16 +36,12 @@ class Game(ndb.Model):
     def new_game(cls, creator_name, players, current_int, max_int, max_increment):
         if len(players) < 1:
             raise ValueError("You must specify at least one other player")
-            #raise endpoints.BadRequestException("You must specify at least one other player")
         if len(players) != len(set(players)) or creator_name in players:
             raise ValueError("You must only specify unique players")
-            #raise endpoints.BadRequestException("You must only specify unique players")
         if max_increment < 2:
             raise ValueError("max_increment must be at least 2")
-            #raise endpoints.BadRequestException("max_increment must be at least 2")
         if max_int <= current_int:
             raise ValueError("Starting value must be smaller than ending value")
-            #raise endpoints.BadRequestException("Starting value must be smaller than ending value")
 
         for p in players:
             player = User.query(User.name == p).get()
@@ -54,8 +50,6 @@ class Game(ndb.Model):
 
         players.append(creator_name)
         shuffle(players)
-        #game = Game()
-        #game.users = players
         game = Game(current_int=current_int,
                     max_int=max_int,
                     max_increment=max_increment,
@@ -63,6 +57,24 @@ class Game(ndb.Model):
                     users=players)
         game.put()
         return game
+
+    def make_move(self, move_value):
+        self.current_int += move_value
+        game_history = GameHistory.query(ancestor=self.key).get()
+        game_history.add_move(self.users[0], str(move_value))
+
+        if self.current_int >= self.max_int:
+            transaction = self.end_game()
+            message = "Game Over! %s is the loser." % (self.users[0])
+        else:
+            self.users.append(self.users.pop(0))
+            message = "Move successful!"
+            #TODO: transaction is declared twice...(kinda)  ?
+            transaction = {}
+
+        transaction['game'] = self
+        transaction['game_history'] = game_history
+        return transaction, message
 
     def to_form(self, message=None):
         form = GameForm()
