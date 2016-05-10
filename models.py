@@ -73,6 +73,16 @@ class Game(ndb.Model):
         }
         return transaction
 
+    def quit_game(self, loser_name):
+        game_history = GameHistory.query(ancestor=self.key).get()
+        game_history.add_move(loser_name, 'quit')
+
+        transaction = self.end_game(loserindex=self.users.index(loser_name))
+        transaction['game'] = self
+        transaction['game_history'] = game_history
+
+        return transaction
+
 class GameForm(messages.Message):
     current_int = messages.IntegerField(1, variant=messages.Variant.INT32)
     max_int = messages.IntegerField(2, variant=messages.Variant.INT32)

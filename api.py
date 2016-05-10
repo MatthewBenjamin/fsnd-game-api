@@ -88,13 +88,11 @@ class BaskinRobbins31Game(remote.Service):
                       http_method='POST')
     def quit_game(self, request):
         """Authorized user forfeits a current game"""
-        #TODO - fix: possible to 'cancel' completed game
         #   -check error handlings, etc.
         g_user = endpoints.get_current_user()
         if not g_user:
             raise endpoints.UnauthorizedException('Authorization required')
 
-        # TODO: DRY (same query as get_user_games)
         user = User.query(User.email == g_user.email()).get()
         users_games = Game.query(Game.users.IN((user.name,))).fetch()
         game = get_by_urlsafe(request.urlsafe_game_key, Game)
@@ -103,12 +101,10 @@ class BaskinRobbins31Game(remote.Service):
             raise endpoints.NotFoundException('User not part of game')
         if game.game_over:
             raise endpoints.BadRequestException('Game has already finished')
-        game_history = GameHistory.query(ancestor=game.key).get()
-        game_history.add_move(user.name, 'quit')
-        #TODO: DRY transactions (see make_move)?
-        transaction = game.end_game(loserindex=game.users.index(user.name))
-        transaction['game'] = game
-        transaction['game_history'] = game_history
+
+
+        transaction = game.quit_game(loser_name=user.name)
+
         self._save_move_results(**transaction)
         return game.to_form(message="%s has quit. Game over!" % user.name)
 
