@@ -25,8 +25,6 @@ from models import GameForm, GameForms, GameHistoryForm, UserForms
 
 from utils import get_by_urlsafe
 
-from random import shuffle
-
 WEB_CLIENT_ID = '1076330149728-67iteco8l0sk3i9teeh86k8ouma2rdjm.apps.googleusercontent.com'
 EMAIL_SCOPE = endpoints.EMAIL_SCOPE
 API_EXPLORER_CLIENT_ID = endpoints.API_EXPLORER_CLIENT_ID
@@ -35,14 +33,12 @@ API_EXPLORER_CLIENT_ID = endpoints.API_EXPLORER_CLIENT_ID
 CREATE_USER_REQUEST = endpoints.ResourceContainer(username=messages.StringField(1, required=True))
 REQUEST_BY_USERNAME = endpoints.ResourceContainer(username = messages.StringField(1, required=True))
 NEW_GAME_REQUEST = endpoints.ResourceContainer(other_players = messages.StringField(1, repeated=True),
-                                               starting_int=messages.IntegerField(2, variant=messages.Variant.INT32),
-                                               max_int=messages.IntegerField(3, variant=messages.Variant.INT32),
-                                               max_increment=messages.IntegerField(4, variant=messages.Variant.INT32))
+                                               starting_int=messages.IntegerField(2, default=0),
+                                               max_int=messages.IntegerField(3, default=31),
+                                               max_increment=messages.IntegerField(4, default=3))
 
 MAKE_MOVE_REQUEST = endpoints.ResourceContainer(urlsafe_game_key=messages.StringField(1, required=True),
-                                                value=messages.IntegerField(2,
-                                                    variant=messages.Variant.INT32, required=True)
-                                                )
+                                                value=messages.IntegerField(2, required=True))
 GAME_REQUEST = endpoints.ResourceContainer(urlsafe_game_key=messages.StringField(1, required=True),)
 
 @endpoints.api(name='baskin_robbins_31', version='v1',
@@ -120,8 +116,6 @@ class BaskinRobbins31Game(remote.Service):
         return UserForms(users=[user.to_form() for user in rankings])
 
     ##### GAME METHODS #####
-
-    # TODO: make code cleaner/more modular?
     @endpoints.method(request_message=NEW_GAME_REQUEST,
                       response_message=GameForm,
                       path='new_game',
@@ -134,52 +128,18 @@ class BaskinRobbins31Game(remote.Service):
             raise endpoints.UnauthorizedException('Authorization required')
         user = User.query(User.email == g_user.email()).get()
         if not user:
-            # TODO new user?
-            raise endpoints.UnauthorizedException('Authorization required')
-        players = request.other_players
-        starting_int = request.starting_int
-        max_int = request.max_int
-        max_increment = request.max_increment
+            raise endpoints.NotFoundException('User with %s gplus account does not exist' % g_user.email())
 
-        if len(players) < 1:
-            raise endpoints.BadRequestException("You must specify at least one other player.")
-        if len(players) != len(set(players)) or user.name in players:
-            raise endpoints.BadRequestException("You must only specify unique players.")
-        if max_increment and max_increment < 2:
-            raise endpoints.BadRequestException("max_increment must be at least 2")
-        if max_int and starting_int and max_int <= starting_int:
-            raise endpoints.BadRequestException("Starting value must be smaller than ending value")
-        elif max_int and max_int <1:
-            raise endpoints.BadRequestException("max_int must be at least 1")
-        elif starting_int and starting_int > 30:
-            raise endpoints.BadRequestException("starting_int is too big")
+        try:
+            game = Game.new_game(current_int = request.starting_int,
+                                 max_int = request.max_int,
+                                 max_increment = request.max_increment,
+                                 creator_name = user.name,
+                                 players = request.other_players)
+        except ValueError as error:
+            raise endpoints.BadRequestException(error)
 
-        # TODO: use game classmethod? (i.e. new_game())
-        game = Game()
-        for p in players:
-            player = User.query(User.name == p).get()
-            if not player:
-                raise endpoints.NotFoundException("User %s doesn't not exist." % p)
-
-        players.append(user.name)
-        shuffle(players)
-        game = Game()
-        game.users = players
-        if starting_int:
-            game.current_int = starting_int
-        if max_int:
-            game.max_int = max_int
-        if max_increment:
-            game.max_increment = max_increment
-
-        # TODO: use game classmethod? (i.e. new_game())
-        # can't do both puts in same transaction (game needs a key to be ancestor)
-        # - any alternative failsafes?
-        game.put()
-        history_id = GameHistory.allocate_ids(size=1, parent=game.key)[0]
-        history_key = ndb.Key(GameHistory, history_id, parent=game.key)
-        GameHistory(key=history_key).put()
-
+        GameHistory.new_history(game)
         return game.to_form(message="New game created")
 
     # get simple game info by key

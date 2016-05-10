@@ -1,6 +1,8 @@
 from google.appengine.ext import ndb
 from protorpc import messages
 
+from random import shuffle
+
 class User(ndb.Model):
     name = ndb.StringProperty(required=True)
     email = ndb.StringProperty()
@@ -29,6 +31,38 @@ class Game(ndb.Model):
     users = ndb.StringProperty(repeated=True)
     created = ndb.DateTimeProperty(auto_now_add=True)
     last_update = ndb.DateTimeProperty(auto_now=True)
+
+    @classmethod
+    def new_game(cls, creator_name, players, current_int, max_int, max_increment):
+        if len(players) < 1:
+            raise ValueError("You must specify at least one other player")
+            #raise endpoints.BadRequestException("You must specify at least one other player")
+        if len(players) != len(set(players)) or creator_name in players:
+            raise ValueError("You must only specify unique players")
+            #raise endpoints.BadRequestException("You must only specify unique players")
+        if max_increment < 2:
+            raise ValueError("max_increment must be at least 2")
+            #raise endpoints.BadRequestException("max_increment must be at least 2")
+        if max_int <= current_int:
+            raise ValueError("Starting value must be smaller than ending value")
+            #raise endpoints.BadRequestException("Starting value must be smaller than ending value")
+
+        for p in players:
+            player = User.query(User.name == p).get()
+            if not player:
+                raise endpoints.NotFoundException("User %s doesn't not exist." % p)
+
+        players.append(creator_name)
+        shuffle(players)
+        #game = Game()
+        #game.users = players
+        game = Game(current_int=current_int,
+                    max_int=max_int,
+                    max_increment=max_increment,
+                    game_over=False,
+                    users=players)
+        game.put()
+        return game
 
     def to_form(self, message=None):
         form = GameForm()
@@ -116,6 +150,12 @@ class MoveRecordForm(messages.Message):
 
 class GameHistory(ndb.Model):
     moves = ndb.StructuredProperty(MoveRecord, repeated=True)
+
+    @classmethod
+    def new_history(cls, game):
+        history_id = cls.allocate_ids(size=1, parent=game.key)[0]
+        history_key = ndb.Key(cls, history_id, parent=game.key)
+        cls(key=history_key).put()
 
     def add_move(self,username,move):
         self.moves.append(MoveRecord(username=username,move=move))
