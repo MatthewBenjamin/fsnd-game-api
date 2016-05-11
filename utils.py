@@ -3,7 +3,7 @@
 import endpoints
 from google.appengine.ext import ndb
 
-from models import Game
+from models import Game, User
 
 def get_by_urlsafe(urlsafe_key, model):
     try:
@@ -26,3 +26,12 @@ def get_by_urlsafe(urlsafe_key, model):
 def get_games_by_username(username):
     games = Game.query(Game.users.IN((username,))).fetch()
     return games
+
+def get_user_by_gplus():
+    g_user = endpoints.get_current_user()
+    if not g_user:
+        raise endpoints.UnauthorizedException('Authorization required')
+    user = User.query(User.email == g_user.email()).get()
+    if not user:
+        raise endpoints.NotFoundException('User with %s gplus account does not exist' % g_user.email())
+    return user

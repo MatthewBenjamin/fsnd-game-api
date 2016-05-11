@@ -22,7 +22,7 @@ from google.appengine.ext import ndb
 from models import User, Game, GameHistory, Score, StringMessage
 from models import GameForm, GameForms, GameHistoryForm, UserForms
 
-from utils import get_by_urlsafe, get_games_by_username
+from utils import get_by_urlsafe, get_games_by_username, get_user_by_gplus
 
 WEB_CLIENT_ID = '1076330149728-67iteco8l0sk3i9teeh86k8ouma2rdjm.apps.googleusercontent.com'
 EMAIL_SCOPE = endpoints.EMAIL_SCOPE
@@ -83,16 +83,7 @@ class BaskinRobbins31Game(remote.Service):
                       http_method='POST')
     def quit_game(self, request):
         """Authorized user forfeits a current game"""
-        #   -check error handlings, etc.
-        # TODO: DRY: check g_user and user in many funcs...
-        g_user = endpoints.get_current_user()
-        if not g_user:
-            raise endpoints.UnauthorizedException('Authorization required')
-        user = User.query(User.email == g_user.email()).get()
-        if not user:
-            raise endpoints.NotFoundException('User with %s gplus account does not exist' % g_user.email())
-
-        # TODO: DRY with get_user_games query
+        user = get_user_by_gplus()
         users_games = get_games_by_username(request.username)
         game = get_by_urlsafe(request.urlsafe_game_key, Game)
         if game not in users_games:
@@ -126,14 +117,7 @@ class BaskinRobbins31Game(remote.Service):
                       http_method='POST')
     def new_game(self, request):
         """Create a new game"""
-        # TODO: DRY: check g_user and user in many funcs...
-        g_user = endpoints.get_current_user()
-        if not g_user:
-            raise endpoints.UnauthorizedException('Authorization required')
-        user = User.query(User.email == g_user.email()).get()
-        if not user:
-            raise endpoints.NotFoundException('User with %s gplus account does not exist' % g_user.email())
-
+        user = get_user_by_gplus()
         try:
             game = Game.new_game(current_int = request.starting_int,
                                  max_int = request.max_int,
@@ -186,14 +170,7 @@ class BaskinRobbins31Game(remote.Service):
     def make_move(self, request):
         # TODO: DRY: check g_user and user in many funcs...
         """Next player makes their move. Returns the updated game state"""
-        g_user = endpoints.get_current_user()
-        if not g_user:
-            raise endpoints.UnauthorizedException('Authorization required')
-
-        user = User.query(User.email == g_user.email()).get()
-        if not user:
-            raise endpoints.NotFoundException('User does not exist')
-
+        user = get_user_by_gplus()
         game = get_by_urlsafe(request.urlsafe_game_key, Game)
         move_value = request.value
 
