@@ -3,6 +3,8 @@
 import endpoints
 from google.appengine.ext import ndb
 
+from models import Game
+
 def get_by_urlsafe(urlsafe_key, model):
     try:
         key = ndb.Key(urlsafe=urlsafe_key)
@@ -20,3 +22,7 @@ def get_by_urlsafe(urlsafe_key, model):
     if not isinstance(entity, model):
         raise ValueError('Incorrect Kind')
     return entity
+
+def get_games_by_username(username):
+    games = Game.query(Game.users.IN((username,))).fetch()
+    return games

@@ -1,10 +1,9 @@
     #####################################################
     # TODOs
-    # ### - REFACTOR CODE - ###
-    #   -add oauth (allowed_client_ids & scopes in endpoints.api()
-    #   ### change game.user to instead store user keys ###
-    #   -implement oauth for api methods(which ones?)
-    #   -graceful error handling
+    # ### - add graceful error handling - ###
+    #
+    #   -add/check oauth support for client-side?
+    #
     #   -readme
     #   -check other project specs
     #
@@ -23,7 +22,7 @@ from google.appengine.ext import ndb
 from models import User, Game, GameHistory, Score, StringMessage
 from models import GameForm, GameForms, GameHistoryForm, UserForms
 
-from utils import get_by_urlsafe
+from utils import get_by_urlsafe, get_games_by_username
 
 WEB_CLIENT_ID = '1076330149728-67iteco8l0sk3i9teeh86k8ouma2rdjm.apps.googleusercontent.com'
 EMAIL_SCOPE = endpoints.EMAIL_SCOPE
@@ -74,7 +73,7 @@ class BaskinRobbins31Game(remote.Service):
                       http_method='GET')
     def get_user_games(self, request):
         """Get a user's games (by unique username)"""
-        games = Game.query(Game.users.IN((request.username,))).fetch()
+        games = get_games_by_username(request.username)
         return GameForms(games = [game.to_form() for game in games])
 
     @endpoints.method(request_message=GAME_REQUEST,
@@ -85,12 +84,16 @@ class BaskinRobbins31Game(remote.Service):
     def quit_game(self, request):
         """Authorized user forfeits a current game"""
         #   -check error handlings, etc.
+        # TODO: DRY: check g_user and user in many funcs...
         g_user = endpoints.get_current_user()
         if not g_user:
             raise endpoints.UnauthorizedException('Authorization required')
-
         user = User.query(User.email == g_user.email()).get()
-        users_games = Game.query(Game.users.IN((user.name,))).fetch()
+        if not user:
+            raise endpoints.NotFoundException('User with %s gplus account does not exist' % g_user.email())
+
+        # TODO: DRY with get_user_games query
+        users_games = get_games_by_username(request.username)
         game = get_by_urlsafe(request.urlsafe_game_key, Game)
         if game not in users_games:
             # TODO: proper error msg?
@@ -123,6 +126,7 @@ class BaskinRobbins31Game(remote.Service):
                       http_method='POST')
     def new_game(self, request):
         """Create a new game"""
+        # TODO: DRY: check g_user and user in many funcs...
         g_user = endpoints.get_current_user()
         if not g_user:
             raise endpoints.UnauthorizedException('Authorization required')
@@ -180,6 +184,7 @@ class BaskinRobbins31Game(remote.Service):
                       name='make_move',
                       http_method='POST')
     def make_move(self, request):
+        # TODO: DRY: check g_user and user in many funcs...
         """Next player makes their move. Returns the updated game state"""
         g_user = endpoints.get_current_user()
         if not g_user:
