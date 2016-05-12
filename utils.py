@@ -5,7 +5,7 @@ from google.appengine.ext import ndb
 
 from models import Game, User
 
-def get_by_urlsafe(urlsafe_key, model):
+def get_by_urlsafe(urlsafe_key, model, ancestor_query=False):
     try:
         key = ndb.Key(urlsafe=urlsafe_key)
     except TypeError:
@@ -16,7 +16,10 @@ def get_by_urlsafe(urlsafe_key, model):
         else:
             raise
 
-    entity = key.get()
+    if ancestor_query:
+        entity = model.query(ancestor=key).get()
+    else:
+        entity = key.get()
     if not entity:
         return None
     if not isinstance(entity, model):
@@ -25,6 +28,8 @@ def get_by_urlsafe(urlsafe_key, model):
 
 def get_games_by_username(username):
     games = Game.query(Game.users.IN((username,))).fetch()
+    if not games and not User.query(User.name == username).get():
+        raise endpoints.NotFoundException('User does not exist')
     return games
 
 def get_user_by_gplus():

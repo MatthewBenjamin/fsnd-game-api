@@ -1,6 +1,5 @@
     #####################################################
     # TODOs
-    # ### - add graceful error handling - ###
     #
     #   -add/check oauth support for client-side?
     #
@@ -87,18 +86,15 @@ class BaskinRobbins31Game(remote.Service):
         users_games = get_games_by_username(request.username)
         game = get_by_urlsafe(request.urlsafe_game_key, Game)
         if game not in users_games:
-            # TODO: proper error msg?
-            raise endpoints.NotFoundException('User not part of game')
+            raise endpoints.ForbiddenException('User not part of game')
         if game.game_over:
-            raise endpoints.BadRequestException('Game has already finished')
-
+            raise endpoints.ForbiddenException('Game has already finished')
 
         transaction = game.quit_game(loser_name=user.name)
 
         self._save_move_results(**transaction)
         return game.to_form(message="%s has quit. Game over!" % user.name)
 
-    # TODO: error handling?
     @endpoints.method(request_message=message_types.VoidMessage,
                       response_message=UserForms,
                       path='rankings',
@@ -130,7 +126,6 @@ class BaskinRobbins31Game(remote.Service):
         GameHistory.new_history(game)
         return game.to_form(message="New game created")
 
-    # get simple game info by key
     @endpoints.method(request_message=GAME_REQUEST,
                       response_message=GameForm,
                       path='game/{urlsafe_game_key}',
@@ -138,7 +133,6 @@ class BaskinRobbins31Game(remote.Service):
                       http_method='GET')
     def get_game(self, request):
         """Get game by URL safe key"""
-        # TODO: raise bad request, etc. errors (in utils?)
         game = get_by_urlsafe(request.urlsafe_game_key, Game)
         return game.to_form()
 
@@ -149,8 +143,7 @@ class BaskinRobbins31Game(remote.Service):
                       http_method='GET')
     def get_game_history(self, request):
         """Get game history by game's urlsafe key"""
-        # TODO: raise bad request, etc. errors
-        game_history = GameHistory.query(ancestor=ndb.Key(urlsafe=request.urlsafe_game_key)).get()
+        game_history = get_by_urlsafe(request.urlsafe_game_key, GameHistory, ancestor_query=True)
         return game_history.to_form()
 
     @ndb.transactional(xg=True)
@@ -168,7 +161,6 @@ class BaskinRobbins31Game(remote.Service):
                       name='make_move',
                       http_method='POST')
     def make_move(self, request):
-        # TODO: DRY: check g_user and user in many funcs...
         """Next player makes their move. Returns the updated game state"""
         user = get_user_by_gplus()
         game = get_by_urlsafe(request.urlsafe_game_key, Game)
