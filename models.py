@@ -33,22 +33,16 @@ class Game(ndb.Model):
     last_update = ndb.DateTimeProperty(auto_now=True)
 
     @classmethod
-    def new_game(cls, creator_name, players, current_int, max_int, max_increment):
-        if len(players) < 1:
+    def new_game(cls, players, current_int, max_int, max_increment):
+        if len(players) < 2:
             raise ValueError("You must specify at least one other player")
-        if len(players) != len(set(players)) or creator_name in players:
+        if len(players) != len(set(players)):
             raise ValueError("You must only specify unique players")
         if max_increment < 2:
             raise ValueError("max_increment must be at least 2")
         if max_int <= current_int:
             raise ValueError("Starting value must be smaller than ending value")
 
-        for p in players:
-            player = User.query(User.name == p).get()
-            if not player:
-                raise endpoints.NotFoundException("User %s doesn't not exist." % p)
-
-        players.append(creator_name)
         shuffle(players)
         game = Game(current_int=current_int,
                     max_int=max_int,
@@ -69,7 +63,6 @@ class Game(ndb.Model):
         else:
             self.users.append(self.users.pop(0))
             message = "Move successful!"
-            #TODO: transaction is declared twice...(kinda)  ?
             transaction = {}
 
         transaction['game'] = self
@@ -89,7 +82,6 @@ class Game(ndb.Model):
         form.last_update = str(self.last_update)
         return form
 
-    #TODO: get loser by index or name?
     def end_game(self, loserindex=0):
         self.game_over = True
         loser = self.users[loserindex]
@@ -99,7 +91,6 @@ class Game(ndb.Model):
         scores = []
         for user in winners:
             user.rating += winner_score
-            # TODO allocate multiple ids outside of loop(size=len(winners), then assign in loop?
             score_id = Score.allocate_ids(size=1, parent=user.key)[0]
             score_key = ndb.Key(Score, score_id, parent=user.key)
             score = Score(points=winner_score, game_key=self.key, key=score_key)

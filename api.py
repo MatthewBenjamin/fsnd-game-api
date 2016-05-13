@@ -114,12 +114,22 @@ class BaskinRobbins31Game(remote.Service):
     def new_game(self, request):
         """Create a new game"""
         user = get_user_by_gplus()
+        players = request.other_players
+
+        for p in players:
+            player = User.query(User.name == p).get()
+            if not player:
+                raise endpoints.NotFoundException("User %s doesn't not exist." % p)
+
+        players.append(user.name)
+        print "*********************************"
+        print players
+
         try:
             game = Game.new_game(current_int = request.starting_int,
                                  max_int = request.max_int,
                                  max_increment = request.max_increment,
-                                 creator_name = user.name,
-                                 players = request.other_players)
+                                 players = players)
         except ValueError as error:
             raise endpoints.BadRequestException(error)
 
