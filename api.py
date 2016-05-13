@@ -1,17 +1,11 @@
     #####################################################
     # TODOs
-    #
-    #   -add/check oauth support for client-side?
-    #
+    #   -add: get_user_scores
+    #         get_game_scores
     #   -readme
     #   -check other project specs
-    #
     #   -check code comments
     #   -write design.txt (see project rubric/description)
-    # Methods to implement:
-    #
-    #       - add PC players?
-    #
     #####################################################
 import endpoints
 from protorpc import messages, message_types, remote
@@ -122,8 +116,6 @@ class BaskinRobbins31Game(remote.Service):
                 raise endpoints.NotFoundException("User %s doesn't not exist." % p)
 
         players.append(user.name)
-        print "*********************************"
-        print players
 
         try:
             game = Game.new_game(current_int = request.starting_int,
@@ -167,9 +159,9 @@ class BaskinRobbins31Game(remote.Service):
 
     @endpoints.method(request_message=MAKE_MOVE_REQUEST,
                       response_message=GameForm,
-                      path='make_move',
+                      path='game/{urlsafe_game_key}',
                       name='make_move',
-                      http_method='POST')
+                      http_method='PUT')
     def make_move(self, request):
         """Next player makes their move. Returns the updated game state"""
         user = get_user_by_gplus()
