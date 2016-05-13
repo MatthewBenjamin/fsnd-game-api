@@ -171,7 +171,7 @@ class GameHistoryForm(messages.Message):
 
 class Score(ndb.Model):
     created = ndb.DateTimeProperty(auto_now_add=True)
-    points = ndb.FloatProperty(required=True) # 1.0 / number of winners
+    points = ndb.FloatProperty(required=True) # 1.0 / number of winners or -1 (for loser)
     game_key = ndb.KeyProperty(required=True, kind="Game")
 
     def to_form(self):
@@ -179,11 +179,15 @@ class Score(ndb.Model):
         form.created = str(self.created)
         form.points = self.points
         form.game_key = self.game_key.urlsafe()
+        return form
 
 class ScoreForm(messages.Message):
     created = messages.StringField(1)
     points = messages.FloatField(2)
     game_key = messages.StringField(3)
+
+class ScoreForms(messages.Message):
+    scores = messages.MessageField(ScoreForm, 1, repeated=True)
 
 class StringMessage(messages.Message):
     """StringMessage -- outbound (single) string message"""

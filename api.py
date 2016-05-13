@@ -13,7 +13,7 @@ from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
 
 from models import User, Game, GameHistory, Score, StringMessage
-from models import GameForm, GameForms, GameHistoryForm, UserForms
+from models import GameForm, GameForms, GameHistoryForm, UserForms, ScoreForms
 
 from utils import get_by_urlsafe, get_games_by_username, get_user_by_gplus
 
@@ -68,6 +68,21 @@ class BaskinRobbins31Game(remote.Service):
         """Get a user's games (by unique username)"""
         games = get_games_by_username(request.username)
         return GameForms(games = [game.to_form() for game in games])
+
+    @endpoints.method(request_message=REQUEST_BY_USERNAME,
+                      response_message=ScoreForms,
+                      path='user/{username}/scores',
+                      name='get_user_scores',
+                      http_method='GET')
+    def get_user_scores(self, request):
+        user = User.query(User.name == request.username).get()
+        if not user:
+            raise endpoints.NotFoundException("User doesn't exist")
+        scores = Score.query(ancestor=user.key).fetch()
+        if not scores:
+            raise endpoints.NotFoundException("That user hasn't recorded any scores yet")
+        return ScoreForms(scores = [score.to_form() for score in scores])
+
 
     @endpoints.method(request_message=GAME_REQUEST,
                       response_message=GameForm,
@@ -137,6 +152,19 @@ class BaskinRobbins31Game(remote.Service):
         """Get game by URL safe key"""
         game = get_by_urlsafe(request.urlsafe_game_key, Game)
         return game.to_form()
+
+    @endpoints.method(request_message=GAME_REQUEST,
+                      response_message=ScoreForms,
+                      path='game/{urlsafe_game_key}/scores',
+                      name='get_game_scores',
+                      http_method='GET')
+    def get_game_scores(self, request):
+        """Get game scores by game's urlsafe key"""
+        game = get_by_urlsafe(request.urlsafe_game_key)
+        if game.game_over == True:
+            raise endpoints.BadRequestException("Game has not finished yet")
+        scores = Score.query(Score.game_key == ndb.Key(urlsafe=request.urlsafe_game_key)).fetch()
+        return ScoreForms(scores = [score.to_form() for score in scores])
 
     @endpoints.method(request_message=GAME_REQUEST,
                       response_message=GameHistoryForm,
