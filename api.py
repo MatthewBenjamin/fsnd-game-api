@@ -160,8 +160,8 @@ class BaskinRobbins31Game(remote.Service):
                       http_method='GET')
     def get_game_scores(self, request):
         """Get game scores by game's urlsafe key"""
-        game = get_by_urlsafe(request.urlsafe_game_key)
-        if game.game_over == True:
+        game = get_by_urlsafe(request.urlsafe_game_key, Game)
+        if game.game_over == False:
             raise endpoints.BadRequestException("Game has not finished yet")
         scores = Score.query(Score.game_key == ndb.Key(urlsafe=request.urlsafe_game_key)).fetch()
         return ScoreForms(scores = [score.to_form() for score in scores])
