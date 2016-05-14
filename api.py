@@ -1,7 +1,5 @@
     #####################################################
     # TODOs
-    #   -add: get_user_scores
-    #         get_game_scores
     #   -readme
     #   -check other project specs
     #   -check code comments
@@ -13,7 +11,8 @@ from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
 
 from models import User, Game, GameHistory, Score, StringMessage
-from models import GameForm, GameForms, GameHistoryForm, UserForms, ScoreForms
+from models import GameForm, GameForms, NewGameForm, MakeMoveForm, GameHistoryForm,\
+                   UserForms, ScoreForms
 
 from utils import get_by_urlsafe, get_games_by_username, get_user_by_gplus
 
@@ -22,15 +21,10 @@ EMAIL_SCOPE = endpoints.EMAIL_SCOPE
 API_EXPLORER_CLIENT_ID = endpoints.API_EXPLORER_CLIENT_ID
 
 # REQUEST MESSAGES
-CREATE_USER_REQUEST = endpoints.ResourceContainer(username=messages.StringField(1, required=True))
-REQUEST_BY_USERNAME = endpoints.ResourceContainer(username = messages.StringField(1, required=True))
-NEW_GAME_REQUEST = endpoints.ResourceContainer(other_players = messages.StringField(1, repeated=True),
-                                               starting_int=messages.IntegerField(2, default=0),
-                                               max_int=messages.IntegerField(3, default=31),
-                                               max_increment=messages.IntegerField(4, default=3))
-
-MAKE_MOVE_REQUEST = endpoints.ResourceContainer(urlsafe_game_key=messages.StringField(1, required=True),
-                                                value=messages.IntegerField(2, required=True))
+USER_REQUEST = endpoints.ResourceContainer(username = messages.StringField(1, required=True))
+NEW_GAME_REQUEST = endpoints.ResourceContainer(NewGameForm)
+MAKE_MOVE_REQUEST = endpoints.ResourceContainer(MakeMoveForm,
+                                                urlsafe_game_key = messages.StringField(1, required=True))
 GAME_REQUEST = endpoints.ResourceContainer(urlsafe_game_key=messages.StringField(1, required=True),)
 
 @endpoints.api(name='baskin_robbins_31', version='v1',
@@ -40,7 +34,7 @@ class BaskinRobbins31Game(remote.Service):
     """BasketinRobbins31Game version 0.1"""
 
     ##### USER METHODS #####
-    @endpoints.method(request_message=CREATE_USER_REQUEST,
+    @endpoints.method(request_message=USER_REQUEST,
                       response_message=StringMessage,
                       path='create_user',
                       name='create_user',
@@ -59,7 +53,7 @@ class BaskinRobbins31Game(remote.Service):
         return StringMessage(message="User %s created" % request.username)
 
     # TODO: add optional params to request for completed games, cancelled(?), won, lost, etc.
-    @endpoints.method(request_message=REQUEST_BY_USERNAME,
+    @endpoints.method(request_message=USER_REQUEST,
                       response_message=GameForms,
                       path='user/{username}/games',
                       name='get_user_games',
@@ -69,7 +63,7 @@ class BaskinRobbins31Game(remote.Service):
         games = get_games_by_username(request.username)
         return GameForms(games = [game.to_form() for game in games])
 
-    @endpoints.method(request_message=REQUEST_BY_USERNAME,
+    @endpoints.method(request_message=USER_REQUEST,
                       response_message=ScoreForms,
                       path='user/{username}/scores',
                       name='get_user_scores',

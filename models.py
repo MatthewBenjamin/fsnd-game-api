@@ -134,6 +134,17 @@ class GameForm(messages.Message):
 class GameForms(messages.Message):
     games = messages.MessageField(GameForm, 1, repeated=True)
 
+class NewGameForm(messages.Message):
+    """Used to created a new game"""
+    other_players = messages.StringField(1, repeated=True)
+    starting_int=messages.IntegerField(2, default=0)
+    max_int=messages.IntegerField(3, default=31)
+    max_increment=messages.IntegerField(4, default=3)
+
+class MakeMoveForm(messages.Message):
+    """Form to submit move"""
+    value = messages.IntegerField(1, required=True)
+
 class MoveRecord(ndb.Model):
     username = ndb.StringProperty(required=True)
     move = ndb.StringProperty(required=True)
@@ -179,12 +190,15 @@ class Score(ndb.Model):
         form.created = str(self.created)
         form.points = self.points
         form.game_key = self.game_key.urlsafe()
+        # TODO: just store username in Score model?
+        #form.username = self.key.parent().get().name
         return form
 
 class ScoreForm(messages.Message):
     created = messages.StringField(1)
     points = messages.FloatField(2)
     game_key = messages.StringField(3)
+    #username = messages.StringField(4)
 
 class ScoreForms(messages.Message):
     scores = messages.MessageField(ScoreForm, 1, repeated=True)
