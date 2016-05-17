@@ -1,0 +1,74 @@
+- What additional properties did you add to your models and why?
+
+    -User
+        -rating:        Stores cumulative total of points a user has earned from all games
+                        she has played.
+
+                        Justification:
+                        Storing each user's cumulative rating allows for a more efficient
+                        retrieval of user rankings. Instead of having to retrieve all of
+                        the Score entities associated with a user, compute each user's
+                        total score, and then return a sorted list of users with their
+                        scores, all users can simply be queried for and sorted by their rating.
+
+    -Game
+        -current_int:   Stores the current integer count for the game.
+        -max_int:       Stores the value at which, when the count is equal to or greater
+                        then this value, the game will end.
+        -max_increment: Stores the maximum value that any player can increment the count
+                        by in a single turn.
+
+                        Justification:
+                        While the game count could have alternatively been implemented
+                        with two variables instead of three (max_increment as above and
+                        remaining_int, which would store the remaining integer count for
+                        the game and decrement each turn. The game ends when it
+                        reaches zero), instead I decided it would make for more dynamic
+                        gameplay to implement the above solution. By storing the current_int
+                        and the max_int, it will become slightly more difficult for players
+                        to notice patterns across games than compared with decrementing
+                        a single count.
+
+        -users:         Stores a list of usernames playing in the game, in order of their turns.
+
+                        Justification:
+                        Users could have been stored in different ways, for example an
+                        alternative would have been to store each User's key as a repeated
+                        KeyProperty instead. However, since usernames are unique, they are
+                        a viable alternative. Furthermore, storing usernames is preferable,
+                        since they are more memorable than keys, and therefore make
+                        interacting with the API server easier for third parties.
+
+        -last_update:   Automatically records the time when the most recent move for the game
+                        was made.
+
+                        Justification:
+                        Allows the quick retrieval of games that have been idle for a
+                        specified period of time. This is particularly relevant for the
+                        SendReminderEmail cron job.
+    -Score
+        -points:        Stores the points that the player earned for that game. Winning
+                        players will receive 1.0 point divided by the number of fellow
+                        winners, whereas losers will receive -1 point.
+
+                        Justification:
+                        Since the object of this game is to not be the loser, this allows
+                        a way to fairly distribute the points in a way that is zero-sum.
+
+        -game_key:      Stores the key for the game the score is associated with.
+
+                        Justification:
+                        Since the parent of Score is the User associated with that Score,
+                        the game associated with that Score must be stored as a separate
+                        property.
+
+
+- What were some of the trade-offs or struggles you faced when implementing the new game logic?
+
+    One challenge was code organization - where should the new game logic go? In
+    the Guess A Number sample game, some of the code for the game logic was put
+    inside the code for each API endpoint, however some code was implemented as
+    class functions for the Game class. Ultimately, I decided that it would make
+    for clearer, more readable code to have the code for each API endpoint to
+    primarily handle responding to request, while the game logic code was implemented
+    with the Game class itself.
