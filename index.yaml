@@ -15,6 +15,11 @@ indexes:
   - name: last_update
   - name: users
 
+- kind: MoveRecord
+  ancestor: yes
+  properties:
+  - name: datetime
+
 - kind: User
   properties:
   - name: name

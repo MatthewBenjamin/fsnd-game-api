@@ -55,8 +55,7 @@ class Game(ndb.Model):
 
     def make_move(self, move_value):
         self.current_int += move_value
-        game_history = GameHistory.query(ancestor=self.key).get()
-        game_history.add_move(self.users[0], str(move_value))
+        move = MoveRecord.new_move(self, str(move_value))
 
         if self.current_int >= self.max_int:
             transaction = self.end_game()
@@ -67,7 +66,7 @@ class Game(ndb.Model):
             transaction = {}
 
         transaction['game'] = self
-        transaction['game_history'] = game_history
+        transaction['move'] = move
         return transaction, message
 
     def to_form(self, message=None):
@@ -112,12 +111,11 @@ class Game(ndb.Model):
         return transaction
 
     def quit_game(self, loser_name):
-        game_history = GameHistory.query(ancestor=self.key).get()
-        game_history.add_move(loser_name, 'quit')
+        move = MoveRecord.new_move(self, 'quit')
 
         transaction = self.end_game(loserindex=self.users.index(loser_name))
         transaction['game'] = self
-        transaction['game_history'] = game_history
+        transaction['move'] = move
 
         return transaction
 
@@ -151,6 +149,15 @@ class MoveRecord(ndb.Model):
     move = ndb.StringProperty(required=True)
     datetime = ndb.DateTimeProperty(auto_now_add=True)
 
+    @classmethod
+    def new_move(cls, game, move):
+        move_id = cls.allocate_ids(size=1, parent=game.key)[0]
+        move_key = ndb.Key(cls, move_id, parent=game.key)
+        move = cls(username = game.users[0],
+                   move = move,
+                   key=move_key)
+        return move
+
     def to_form(self):
         form = MoveRecordForm()
         form.name = self.username
@@ -163,32 +170,15 @@ class MoveRecordForm(messages.Message):
     move = messages.StringField(2, required=True)
     datetime = messages.StringField(3)
 
-class GameHistory(ndb.Model):
-    moves = ndb.StructuredProperty(MoveRecord, repeated=True)
-
-    @classmethod
-    def new_history(cls, game):
-        history_id = cls.allocate_ids(size=1, parent=game.key)[0]
-        history_key = ndb.Key(cls, history_id, parent=game.key)
-        cls(key=history_key).put()
-
-    def add_move(self,username,move):
-        self.moves.append(MoveRecord(username=username,move=move))
-
-    def to_form(self):
-        return GameHistoryForm(moves=[move.to_form() for move in self.moves])
-
 class GameHistoryForm(messages.Message):
     moves = messages.MessageField(MoveRecordForm, 1, repeated=True)
 
 class Score(ndb.Model):
-    created = ndb.DateTimeProperty(auto_now_add=True)
     points = ndb.FloatProperty(required=True) # 1.0 / number of winners or -1 (for loser)
     game_key = ndb.KeyProperty(required=True, kind="Game")
 
     def to_form(self):
         form = ScoreForm()
-        form.created = str(self.created)
         form.points = self.points
         form.game_key = self.game_key.urlsafe()
         # TODO: just store username in Score model?
@@ -196,9 +186,8 @@ class Score(ndb.Model):
         return form
 
 class ScoreForm(messages.Message):
-    created = messages.StringField(1)
-    points = messages.FloatField(2)
-    game_key = messages.StringField(3)
+    points = messages.FloatField(1)
+    game_key = messages.StringField(2)
     #username = messages.StringField(4)
 
 class ScoreForms(messages.Message):

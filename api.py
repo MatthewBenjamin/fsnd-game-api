@@ -1,16 +1,15 @@
     #####################################################
     # TODOs
-    #   -readme
-    #   -check other project specs
-    #   -check code comments
+    #   -doublecheck readme
+    #   -check code comments, code quality, etc.
     #   -write design.txt (see project rubric/description)
     #####################################################
 import endpoints
 from protorpc import messages, message_types, remote
 from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
-
-from models import User, Game, GameHistory, Score, StringMessage
+# TODO: update for no GameHistory model
+from models import User, Game, MoveRecord, Score, StringMessage
 from models import GameForm, GameForms, NewGameForm, MakeMoveForm, GameHistoryForm,\
                    UserForms, ScoreForms
 
@@ -52,7 +51,7 @@ class BaskinRobbins31Game(remote.Service):
         user.put()
         return StringMessage(message="User %s created" % request.username)
 
-    # TODO: add optional params to request for completed games, cancelled(?), won, lost, etc.
+    # TODO: add optional params to request for completed games, won, lost, etc.
     @endpoints.method(request_message=USER_REQUEST,
                       response_message=GameForms,
                       path='user/{username}/games',
@@ -134,7 +133,6 @@ class BaskinRobbins31Game(remote.Service):
         except ValueError as error:
             raise endpoints.BadRequestException(error)
 
-        GameHistory.new_history(game)
         return game.to_form(message="New game created")
 
     @endpoints.method(request_message=GAME_REQUEST,
@@ -157,7 +155,7 @@ class BaskinRobbins31Game(remote.Service):
         game = get_by_urlsafe(request.urlsafe_game_key, Game)
         if game.game_over == False:
             raise endpoints.BadRequestException("Game has not finished yet")
-        scores = Score.query(Score.game_key == ndb.Key(urlsafe=request.urlsafe_game_key)).fetch()
+        scores = Score.query(Score.game_key == game.key).fetch()
         return ScoreForms(scores = [score.to_form() for score in scores])
 
     @endpoints.method(request_message=GAME_REQUEST,
@@ -167,13 +165,15 @@ class BaskinRobbins31Game(remote.Service):
                       http_method='GET')
     def get_game_history(self, request):
         """Get game history by game's urlsafe key"""
-        game_history = get_by_urlsafe(request.urlsafe_game_key, GameHistory, ancestor_query=True)
-        return game_history.to_form()
+        game = get_by_urlsafe(request.urlsafe_game_key, Game)
+        if game:
+            moves = MoveRecord.query(ancestor=game.key).order(MoveRecord.datetime).fetch()
+        return GameHistoryForm(moves = [move.to_form() for move in moves])
 
     @ndb.transactional(xg=True)
-    def _save_move_results(self, game, game_history, winners=None, loser=None, scores=None):
+    def _save_move_results(self, game, move, winners=None, loser=None, scores=None):
         game.put()
-        game_history.put()
+        move.put()
         if winners and loser and scores:
             ndb.put_multi(winners)
             ndb.put_multi(scores)
