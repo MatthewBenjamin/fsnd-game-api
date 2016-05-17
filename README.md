@@ -7,16 +7,26 @@ players take turns adding to the game's count, incrementing by their choice of
 For example, a game with two players might progress like this:
 
 Player1: "1,2"
+
 Player2: "3,4,5"
+
 Player1: "6,7,8"
+
 Player2: "9"
+
 ...
+
 ...
+
 Player1: "24,25,26"
+
 Player2: "27"
+
 Player1: "28,29,30"
+
 Player2: "31"
-- GAME OVER -
+
+\- GAME OVER -
 
 In the above example, since Player2 was forced to count to 31, that player loses.
 All other players win.
