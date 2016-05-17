@@ -86,7 +86,7 @@ class BaskinRobbins31Game(remote.Service):
     def quit_game(self, request):
         """Authorized user forfeits a current game"""
         user = get_user_by_gplus()
-        users_games = get_games_by_username(request.username)
+        users_games = get_games_by_username(user.name)
         game = get_by_urlsafe(request.urlsafe_game_key, Game)
         if game not in users_games:
             raise endpoints.ForbiddenException('User not part of game')
