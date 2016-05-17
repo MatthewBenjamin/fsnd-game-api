@@ -8,16 +8,17 @@ class User(ndb.Model):
     email = ndb.StringProperty()
     rating = ndb.FloatProperty(default=0)
 
-    def to_form(self):
+    def to_form(self, show_email=False):
         form = UserForm()
         form.name = self.name
-        #form.email = self.email
         form.rating = self.rating
+        if show_email:
+            form.email = self.email
         return form
 
 class UserForm(messages.Message):
     name = messages.StringField(1, required=True)
-    #email = messages.StringField(2)
+    email = messages.StringField(2)
     rating = messages.FloatField(3)
 
 class UserForms(messages.Message):
