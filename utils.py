@@ -25,12 +25,14 @@ def get_by_urlsafe(urlsafe_key, model):
     return entity
 
 def get_games_by_username(username):
+    """Get games by unique username"""
     games = Game.query(Game.users.IN((username,))).fetch()
     if not games and not User.query(User.name == username).get():
         raise endpoints.NotFoundException('User does not exist')
     return games
 
 def get_user_by_gplus():
+    """Returns User associated with gplus account"""
     g_user = endpoints.get_current_user()
     if not g_user:
         raise endpoints.UnauthorizedException('Authorization required')

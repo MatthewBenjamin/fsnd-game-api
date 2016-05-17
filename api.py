@@ -1,14 +1,9 @@
-    #####################################################
-    # TODOs
-    #   -doublecheck readme
-    #   -check code comments, code quality, etc.
-    #   -write design.txt (see project rubric/description)
-    #####################################################
 import endpoints
 from protorpc import messages, message_types, remote
+
 from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
-# TODO: update for no GameHistory model
+
 from models import User, Game, MoveRecord, Score, StringMessage
 from models import GameForm, GameForms, NewGameForm, MakeMoveForm, GameHistoryForm,\
                    UserForms, ScoreForms
@@ -67,6 +62,7 @@ class BaskinRobbins31Game(remote.Service):
                       name='get_user_scores',
                       http_method='GET')
     def get_user_scores(self, request):
+        """Get a user's scores (by unique username)"""
         user = User.query(User.name == request.username).get()
         if not user:
             raise endpoints.NotFoundException("User doesn't exist")
@@ -171,6 +167,7 @@ class BaskinRobbins31Game(remote.Service):
 
     @ndb.transactional(xg=True)
     def _save_move_results(self, game, move, winners=None, loser=None, scores=None):
+        """NDB Transaction to update datastore entities after valid move"""
         game.put()
         move.put()
         if winners and loser and scores:
