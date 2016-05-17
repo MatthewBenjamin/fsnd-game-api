@@ -15,7 +15,6 @@ from models import GameForm, GameForms, NewGameForm, MakeMoveForm, GameHistoryFo
 
 from utils import get_by_urlsafe, get_games_by_username, get_user_by_gplus
 
-WEB_CLIENT_ID = '1076330149728-67iteco8l0sk3i9teeh86k8ouma2rdjm.apps.googleusercontent.com'
 EMAIL_SCOPE = endpoints.EMAIL_SCOPE
 API_EXPLORER_CLIENT_ID = endpoints.API_EXPLORER_CLIENT_ID
 
@@ -27,7 +26,7 @@ MAKE_MOVE_REQUEST = endpoints.ResourceContainer(MakeMoveForm,
 GAME_REQUEST = endpoints.ResourceContainer(urlsafe_game_key=messages.StringField(1, required=True),)
 
 @endpoints.api(name='baskin_robbins_31', version='v1',
-    allowed_client_ids=[WEB_CLIENT_ID, API_EXPLORER_CLIENT_ID],
+    allowed_client_ids=[API_EXPLORER_CLIENT_ID],
     scopes=[EMAIL_SCOPE])
 class BaskinRobbins31Game(remote.Service):
     """BasketinRobbins31Game version 0.1"""
