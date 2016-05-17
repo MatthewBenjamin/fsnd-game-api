@@ -5,7 +5,8 @@ from google.appengine.ext import ndb
 
 from models import Game, User
 
-def get_by_urlsafe(urlsafe_key, model, ancestor_query=False):
+def get_by_urlsafe(urlsafe_key, model):
+    """Returns a datastore entity by urlsafe key"""
     try:
         key = ndb.Key(urlsafe=urlsafe_key)
     except TypeError:
@@ -16,10 +17,7 @@ def get_by_urlsafe(urlsafe_key, model, ancestor_query=False):
         else:
             raise
 
-    if ancestor_query:
-        entity = model.query(ancestor=key).get()
-    else:
-        entity = key.get()
+    entity = key.get()
     if not entity:
         return None
     if not isinstance(entity, model):
