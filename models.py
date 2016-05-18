@@ -1,7 +1,10 @@
+# models.py - models for Baskin Robbins 31 Game API
+
 from google.appengine.ext import ndb
 from protorpc import messages
 
 from random import shuffle
+
 
 class User(ndb.Model):
     """User profile"""
@@ -18,15 +21,18 @@ class User(ndb.Model):
             form.email = self.email
         return form
 
+
 class UserForm(messages.Message):
     """UserForm for outbound User profile"""
     name = messages.StringField(1, required=True)
     email = messages.StringField(2)
     rating = messages.FloatField(3)
 
+
 class UserForms(messages.Message):
     """Return multiple UserForms"""
     users = messages.MessageField(UserForm, 1, repeated=True)
+
 
 class Game(ndb.Model):
     """Game object"""
@@ -48,7 +54,8 @@ class Game(ndb.Model):
         if max_increment < 2:
             raise ValueError("max_increment must be at least 2")
         if max_int <= current_int:
-            raise ValueError("Starting value must be smaller than ending value")
+            raise ValueError(
+                "Starting value must be smaller than ending value")
 
         shuffle(players)
         game = Game(current_int=current_int,
@@ -65,16 +72,16 @@ class Game(ndb.Model):
         move = MoveRecord.new_move(self, str(move_value))
 
         if self.current_int >= self.max_int:
-            transaction = self.end_game()
+            moveResultsToSave = self.end_game()
             message = "Game Over! %s is the loser." % (self.users[0])
         else:
             self.users.append(self.users.pop(0))
             message = "Move successful!"
-            transaction = {}
+            moveResultsToSave = {}
 
-        transaction['game'] = self
-        transaction['move'] = move
-        return transaction, message
+        moveResultsToSave['game'] = self
+        moveResultsToSave['move'] = move
+        return moveResultsToSave, message
 
     def to_form(self, message=None):
         """Return a GameForm representation of the Game"""
@@ -95,7 +102,7 @@ class Game(ndb.Model):
            player entities for datastore transaction"""
         self.game_over = True
         loser = self.users[loserindex]
-        winners = self.users[:loserindex] + self.users[loserindex+1:]
+        winners = self.users[:loserindex] + self.users[loserindex + 1:]
         winner_score = 1.0 / len(winners)
         winners = User.query(User.name.IN(winners)).fetch()
         scores = []
@@ -103,33 +110,36 @@ class Game(ndb.Model):
             user.rating += winner_score
             score_id = Score.allocate_ids(size=1, parent=user.key)[0]
             score_key = ndb.Key(Score, score_id, parent=user.key)
-            score = Score(points=winner_score, game_key=self.key, key=score_key)
+            score = Score(points=winner_score, game_key=self.key,
+                          key=score_key)
             scores.append(score)
 
         loser = User.query(User.name == loser).get()
         loser.rating -= 1
         score_id = Score.allocate_ids(size=1, parent=loser.key)[0]
         score_key = ndb.Key(Score, score_id, parent=loser.key)
-        score = Score(points=-1,game_key=self.key, key=score_key)
+        score = Score(points=-1, game_key=self.key, key=score_key)
         scores.append(score)
 
-        transaction = {
+        gameResultsToSave = {
             'winners': winners,
             'loser': loser,
-            'scores':scores
+            'scores': scores
         }
-        return transaction
+        return gameResultsToSave
 
     def quit_game(self, loser_name):
         """Ends the game with the quitting player as the loser. Return entities for
            datastore transaction"""
         move = MoveRecord.new_move(self, 'quit')
 
-        transaction = self.end_game(loserindex=self.users.index(loser_name))
-        transaction['game'] = self
-        transaction['move'] = move
+        gameResultsToSave = self.end_game(
+            loserindex=self.users.index(loser_name))
+        gameResultsToSave['game'] = self
+        gameResultsToSave['move'] = move
 
-        return transaction
+        return gameResultsToSave
+
 
 class GameForm(messages.Message):
     """GameForm for outbound game state information"""
@@ -143,20 +153,24 @@ class GameForm(messages.Message):
     created = messages.StringField(8)
     last_update = messages.StringField(9)
 
+
 class GameForms(messages.Message):
     """Return multiple GameForms"""
     games = messages.MessageField(GameForm, 1, repeated=True)
 
+
 class NewGameForm(messages.Message):
     """Used to created a new game"""
     other_players = messages.StringField(1, repeated=True)
-    starting_int=messages.IntegerField(2, default=0)
-    max_int=messages.IntegerField(3, default=31)
-    max_increment=messages.IntegerField(4, default=3)
+    starting_int = messages.IntegerField(2, default=0)
+    max_int = messages.IntegerField(3, default=31)
+    max_increment = messages.IntegerField(4, default=3)
+
 
 class MakeMoveForm(messages.Message):
     """Form to submit move"""
     value = messages.IntegerField(1, required=True)
+
 
 class MoveRecord(ndb.Model):
     """Stores record of a single move in a Game. Child of Game"""
@@ -169,8 +183,8 @@ class MoveRecord(ndb.Model):
         """Creates and returns a new move"""
         move_id = cls.allocate_ids(size=1, parent=game.key)[0]
         move_key = ndb.Key(cls, move_id, parent=game.key)
-        move = cls(username = game.users[0],
-                   move = move,
+        move = cls(username=game.users[0],
+                   move=move,
                    key=move_key)
         return move
 
@@ -182,19 +196,22 @@ class MoveRecord(ndb.Model):
         form.datetime = str(self.datetime)
         return form
 
+
 class MoveRecordForm(messages.Message):
     """MoveRecordForm for outbound MoveRecord information"""
     name = messages.StringField(1, required=True)
     move = messages.StringField(2, required=True)
     datetime = messages.StringField(3)
 
+
 class GameHistoryForm(messages.Message):
     """Return multiple MoveRecordForms"""
     moves = messages.MessageField(MoveRecordForm, 1, repeated=True)
 
+
 class Score(ndb.Model):
     """Score object - stores user's points for a single game"""
-    points = ndb.FloatProperty(required=True) # 1.0 / number of winners or -1 (for loser)
+    points = ndb.FloatProperty(required=True)
     game_key = ndb.KeyProperty(required=True, kind="Game")
 
     def to_form(self):
@@ -202,19 +219,22 @@ class Score(ndb.Model):
         form = ScoreForm()
         form.points = self.points
         form.game_key = self.game_key.urlsafe()
-        # TODO: just store username in Score model?
-        #form.username = self.key.parent().get().name
+        # TODO: just store username in Score model?, i.e. :
+        # form.username = self.key.parent().get().name
         return form
+
 
 class ScoreForm(messages.Message):
     """ScoreForm for outbound Score information"""
     points = messages.FloatField(1)
     game_key = messages.StringField(2)
-    #username = messages.StringField(4)
+    # username = messages.StringField(4)
+
 
 class ScoreForms(messages.Message):
     """Return multiple ScoreForms"""
     scores = messages.MessageField(ScoreForm, 1, repeated=True)
+
 
 class StringMessage(messages.Message):
     """StringMessage -- outbound (single) string message"""

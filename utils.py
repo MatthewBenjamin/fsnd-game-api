@@ -5,6 +5,7 @@ from google.appengine.ext import ndb
 
 from models import Game, User
 
+
 def get_by_urlsafe(urlsafe_key, model):
     """Returns a datastore entity by urlsafe key"""
     try:
@@ -32,6 +33,7 @@ def get_games_by_username(username):
         raise endpoints.NotFoundException('User does not exist')
     return games
 
+
 def get_user_by_gplus():
     """Returns User associated with gplus account"""
     g_user = endpoints.get_current_user()
@@ -39,5 +41,6 @@ def get_user_by_gplus():
         raise endpoints.UnauthorizedException('Authorization required')
     user = User.query(User.email == g_user.email()).get()
     if not user:
-        raise endpoints.NotFoundException('User with %s gplus account does not exist' % g_user.email())
+        raise endpoints.NotFoundException(
+            'User with %s gplus account does not exist' % g_user.email())
     return user

@@ -1,46 +1,53 @@
+# api.py - Baskin Robbins 31 Game API
+
 import endpoints
 from protorpc import messages, message_types, remote
 
-from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
 
 from models import User, Game, MoveRecord, Score, StringMessage
-from models import GameForm, GameForms, NewGameForm, MakeMoveForm, GameHistoryForm,\
-                   UserForms, ScoreForms
-
+from models import (
+    GameForm, GameForms, NewGameForm, MakeMoveForm, GameHistoryForm,
+    UserForms, ScoreForms)
 from utils import get_by_urlsafe, get_games_by_username, get_user_by_gplus
 
 EMAIL_SCOPE = endpoints.EMAIL_SCOPE
 API_EXPLORER_CLIENT_ID = endpoints.API_EXPLORER_CLIENT_ID
 
 # REQUEST MESSAGES
-USER_REQUEST = endpoints.ResourceContainer(username = messages.StringField(1, required=True))
+USER_REQUEST = endpoints.ResourceContainer(
+    username=messages.StringField(1, required=True))
 NEW_GAME_REQUEST = endpoints.ResourceContainer(NewGameForm)
-MAKE_MOVE_REQUEST = endpoints.ResourceContainer(MakeMoveForm,
-                                                urlsafe_game_key = messages.StringField(1, required=True))
-GAME_REQUEST = endpoints.ResourceContainer(urlsafe_game_key=messages.StringField(1, required=True),)
+MAKE_MOVE_REQUEST = endpoints.ResourceContainer(
+    MakeMoveForm,
+    urlsafe_game_key=messages.StringField(1, required=True))
+GAME_REQUEST = endpoints.ResourceContainer(
+    urlsafe_game_key=messages.StringField(1, required=True))
+
 
 @endpoints.api(name='baskin_robbins_31', version='v1',
-    allowed_client_ids=[API_EXPLORER_CLIENT_ID],
-    scopes=[EMAIL_SCOPE])
+               allowed_client_ids=[API_EXPLORER_CLIENT_ID],
+               scopes=[EMAIL_SCOPE])
 class BaskinRobbins31Game(remote.Service):
     """BasketinRobbins31Game version 0.1"""
 
-    ##### USER METHODS #####
+    # USER METHODS
     @endpoints.method(request_message=USER_REQUEST,
                       response_message=StringMessage,
                       path='create_user',
                       name='create_user',
                       http_method='POST')
     def create_user(self, request):
-        """Create a new user"""
+        """Create a new user from user's gplus account (by oauth2)"""
         g_user = endpoints.get_current_user()
         if not g_user:
             raise endpoints.UnauthorizedException('Authorization required')
         if User.query(User.name == request.username).get():
-            raise endpoints.ConflictException("A User with that name already exists.")
+            raise endpoints.ConflictException(
+                "A User with that name already exists.")
         if User.query(User.email == g_user.email()).get():
-            raise endpoints.ConflictException("A User with that Google plus account already exists.")
+            raise endpoints.ConflictException(
+                "A User with that Google plus account already exists.")
         user = User(name=request.username, email=g_user.email())
         user.put()
         return StringMessage(message="User %s created" % request.username)
@@ -54,7 +61,7 @@ class BaskinRobbins31Game(remote.Service):
     def get_user_games(self, request):
         """Get a user's games (by unique username)"""
         games = get_games_by_username(request.username)
-        return GameForms(games = [game.to_form() for game in games])
+        return GameForms(games=[game.to_form() for game in games])
 
     @endpoints.method(request_message=USER_REQUEST,
                       response_message=ScoreForms,
@@ -68,9 +75,9 @@ class BaskinRobbins31Game(remote.Service):
             raise endpoints.NotFoundException("User doesn't exist")
         scores = Score.query(ancestor=user.key).fetch()
         if not scores:
-            raise endpoints.NotFoundException("That user hasn't recorded any scores yet")
-        return ScoreForms(scores = [score.to_form() for score in scores])
-
+            raise endpoints.NotFoundException(
+                "That user hasn't recorded any scores yet")
+        return ScoreForms(scores=[score.to_form() for score in scores])
 
     @endpoints.method(request_message=GAME_REQUEST,
                       response_message=GameForm,
@@ -87,9 +94,9 @@ class BaskinRobbins31Game(remote.Service):
         if game.game_over:
             raise endpoints.ForbiddenException('Game has already finished')
 
-        transaction = game.quit_game(loser_name=user.name)
+        gameResultsToSave = game.quit_game(loser_name=user.name)
 
-        self._save_move_results(**transaction)
+        self._save_move_results(**gameResultsToSave)
         return game.to_form(message="%s has quit. Game over!" % user.name)
 
     @endpoints.method(request_message=message_types.VoidMessage,
@@ -98,11 +105,12 @@ class BaskinRobbins31Game(remote.Service):
                       name='get_user_rankings',
                       http_method='GET')
     def get_user_rankings(self, request):
-        """Get list of all users order by rating"""
-        rankings = User.query().order(-User.rating).fetch(projection=[User.name, User.rating])
+        """Get list of all users, ordered by rating"""
+        rankings = User.query().order(-User.rating).fetch(
+            projection=[User.name, User.rating])
         return UserForms(users=[user.to_form() for user in rankings])
 
-    ##### GAME METHODS #####
+    # GAME METHODS
     @endpoints.method(request_message=NEW_GAME_REQUEST,
                       response_message=GameForm,
                       path='new_game',
@@ -116,15 +124,16 @@ class BaskinRobbins31Game(remote.Service):
         for p in players:
             player = User.query(User.name == p).get()
             if not player:
-                raise endpoints.NotFoundException("User %s doesn't not exist." % p)
+                raise endpoints.NotFoundException(
+                    "User %s doesn't not exist." % p)
 
         players.append(user.name)
 
         try:
-            game = Game.new_game(current_int = request.starting_int,
-                                 max_int = request.max_int,
-                                 max_increment = request.max_increment,
-                                 players = players)
+            game = Game.new_game(current_int=request.starting_int,
+                                 max_int=request.max_int,
+                                 max_increment=request.max_increment,
+                                 players=players)
         except ValueError as error:
             raise endpoints.BadRequestException(error)
 
@@ -148,10 +157,10 @@ class BaskinRobbins31Game(remote.Service):
     def get_game_scores(self, request):
         """Get game scores by game's urlsafe key"""
         game = get_by_urlsafe(request.urlsafe_game_key, Game)
-        if game.game_over == False:
+        if not game.game_over:
             raise endpoints.BadRequestException("Game has not finished yet")
         scores = Score.query(Score.game_key == game.key).fetch()
-        return ScoreForms(scores = [score.to_form() for score in scores])
+        return ScoreForms(scores=[score.to_form() for score in scores])
 
     @endpoints.method(request_message=GAME_REQUEST,
                       response_message=GameHistoryForm,
@@ -162,11 +171,13 @@ class BaskinRobbins31Game(remote.Service):
         """Get game history by game's urlsafe key"""
         game = get_by_urlsafe(request.urlsafe_game_key, Game)
         if game:
-            moves = MoveRecord.query(ancestor=game.key).order(MoveRecord.datetime).fetch()
-        return GameHistoryForm(moves = [move.to_form() for move in moves])
+            moves = MoveRecord.query(
+                ancestor=game.key).order(MoveRecord.datetime).fetch()
+        return GameHistoryForm(moves=[move.to_form() for move in moves])
 
     @ndb.transactional(xg=True)
-    def _save_move_results(self, game, move, winners=None, loser=None, scores=None):
+    def _save_move_results(self, game, move, winners=None,
+                           loser=None, scores=None):
         """NDB Transaction to update datastore entities after valid move"""
         game.put()
         move.put()
@@ -195,9 +206,9 @@ class BaskinRobbins31Game(remote.Service):
         if move_value > game.max_increment or move_value < 1:
             return game.to_form(message="Invalid move value")
 
-        transaction, message = game.make_move(move_value)
+        moveResultsToSave, message = game.make_move(move_value)
 
-        self._save_move_results(**transaction)
+        self._save_move_results(**moveResultsToSave)
         return game.to_form(message=message)
 
 api = endpoints.api_server([BaskinRobbins31Game])

@@ -1,11 +1,10 @@
-import logging
-
+# main.py - handles SendReminderEmail cronjob for Baskin Robbins 31 Game API
 import webapp2
 from google.appengine.api import mail, app_identity
-from api import BaskinRobbins31Game
 
 from datetime import datetime, timedelta
 from models import User, Game
+
 
 class SendReminderEmail(webapp2.RequestHandler):
     def get(self):
@@ -25,7 +24,9 @@ class SendReminderEmail(webapp2.RequestHandler):
             users_to_email = User.query(User.name.IN(users_to_email)).fetch()
         for user in users_to_email:
             subject = 'This is a reminder!'
-            body = 'Hello, you have one or more pending Baskin Robbins 31 games!'
+            body = """\
+                Hello, you have one or more pending Baskin Robbins 31 games!\
+            """
             # This will send test emails, the arguments to send_mail are:
             # from, to, subject, body
             mail.send_mail('noreply@{}.appspotmail.com'.format(app_id),
