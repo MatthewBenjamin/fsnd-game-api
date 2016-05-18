@@ -19,10 +19,11 @@ def get_by_urlsafe(urlsafe_key, model):
 
     entity = key.get()
     if not entity:
-        return None
+        raise endpoints.NotFoundException("Entity not found")
     if not isinstance(entity, model):
         raise ValueError('Incorrect Kind')
     return entity
+
 
 def get_games_by_username(username):
     """Get games by unique username"""
